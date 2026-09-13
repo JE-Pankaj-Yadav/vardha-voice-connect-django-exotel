@@ -549,3 +549,42 @@ GEMINI_VOICE=Kore
 Google currently lists Gemini 3.1 Flash Live Preview with free-tier input/output pricing, subject to the account/project's quota and availability. A free-tier key is not a guarantee of unlimited Live API usage; check Google AI Studio quotas if a call returns `RESOURCE_EXHAUSTED`.
 
 After deploying v1.1 on Render, replace the old `OPENAI_API_KEY` environment variable with `GEMINI_API_KEY`, keep `AI_PROVIDER=gemini`, and redeploy. Do not paste API keys into GitHub.
+
+
+## v1.2.0 live-audio reliability fix
+
+This release fixes the remaining silent-call failure modes found during the real Exotel test.
+
+- Uses the current Gemini Live `generationConfig.responseModalities=["AUDIO"]` shape and places the voice configuration under `generationConfig`.
+- Buffers up to 3 seconds of caller PCM while Gemini is completing `setupComplete`, instead of silently dropping the first caller words.
+- Flushes buffered caller audio immediately after the Gemini session becomes ready.
+- Adds a 12-second Gemini setup watchdog and a 10-second no-AI-audio watchdog so a silent provider failure is recorded as `FAILED` with a useful error instead of appearing as a normal completed call.
+- Keeps the Exotel AgentStream media protocol at 100 ms / 3200-byte chunks for 8 kHz and uses the configured sample rate in the public stream URL. Exotel documents raw/slin 16-bit little-endian mono audio and bidirectional media playback for Voicebot/AgentStream.
+- Adds explicit logs for `setupComplete`, buffered audio flush, and `FIRST GEMINI AUDIO SENT`.
+- Bumps the service-worker cache and release version to `1.2.0`.
+
+### Required Render settings for this release
+
+Set `APP_VERSION=1.2.0`, `AI_PROVIDER=gemini`, `GEMINI_LIVE_MODEL=gemini-3.1-flash-live-preview`, `EXOTEL_STREAMTYPE=bidirectional`, `EXOTEL_STREAM_SAMPLE_RATE=8000`, and `EXOTEL_RECORD=true`.
+
+After deployment, a successful call must show these Render log checkpoints in order:
+
+1. `Exotel event=start`
+2. `Gemini Live connected; waiting for setupComplete`
+3. `Gemini setupComplete`
+4. `Gemini greeting requested`
+5. `FIRST GEMINI AUDIO SENT`
+
+If checkpoint 3 is missing, the issue is Gemini authentication/model/quota/network. If checkpoint 3 exists but checkpoint 5 is missing, Gemini generated no audio and the new watchdog will record the exact failure stage. If checkpoint 5 exists but the caller still hears silence, the issue is on the Exotel bidirectional playback leg and the outgoing `media` payload must be inspected.
+
+## v1.1.1 stability fix
+
+- Fixed the Gemini Live startup crash caused by synchronous Django ORM access from the ASGI async consumer.
+- The Knowledge Base is now loaded through `sync_to_async` before the Gemini Live session is configured.
+- Preserved application-level Gemini/AI failures in call history even when Exotel later reports the telephony leg as `COMPLETED`.
+- Health now reports active Knowledge Base readiness.
+- Added support for logging Gemini interim input transcription without polluting the final transcript.
+
+## Exotel trial limitation
+
+An Exotel trial/KYC restriction cannot be bypassed by application code. If Exotel only permits calls to verified destinations on the current account, unverified destinations must be verified or the account must be enabled for broader outbound calling before those calls can be placed.

@@ -1,12 +1,1 @@
-.git
-.gitignore
-.venv
-__pycache__
-*.py[cod]
-.env
-*.sqlite3
-data/*.sqlite3
-media/*
-staticfiles
-README.md
-*.md
+1.2.0

@@ -109,7 +109,7 @@ def make_stream_url(call_id):
     if not base.startswith("https://"):
         raise RuntimeError("PUBLIC_BASE_URL must start with https:// so Exotel can open a secure WSS connection.")
     ws_base = "wss://" + base[len("https://"):].rstrip("/")
-    params = {"v": "2", "sample-rate": str(settings.EXOTEL_STREAM_SAMPLE_RATE)}
+    params = {"v": "3", "sample-rate": str(settings.EXOTEL_STREAM_SAMPLE_RATE)}
     return f"{ws_base}/ws/exotel/{call_id}/?{urlencode(params)}"
 
 

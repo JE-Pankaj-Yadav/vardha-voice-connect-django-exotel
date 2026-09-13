@@ -1,13 +1,51 @@
-Django==5.2.6
-daphne==4.2.1
-channels==4.3.1
-requests==2.32.5
-python-dotenv==1.1.1
-websockets==15.0.1
-dj-database-url==3.1.2
-psycopg[binary]==3.3.5
-whitenoise==6.12.0
-
-audioop-lts==0.2.2; python_version >= "3.13"
-
-google-genai==2.23.0
+services:
+  - type: web
+    name: vardha-voice-connect
+    runtime: docker
+    plan: free
+    healthCheckPath: /api/health
+    envVars:
+      - key: DJANGO_DEBUG
+        value: "false"
+      - key: APP_NAME
+        value: "Vardha Voice Connect — AI Voice Calling Agent"
+      - key: APP_VERSION
+        value: "1.2.0"
+      - key: DEFAULT_TIMEZONE
+        value: "Asia/Kolkata"
+      - key: EXOTEL_STREAMTYPE
+        value: "bidirectional"
+      - key: EXOTEL_STREAM_SAMPLE_RATE
+        value: "8000"
+      - key: EXOTEL_STREAM_AUDIO_CONTENT_TYPE
+        value: "audio/x-l16;rate=8000"
+      - key: EXOTEL_RECORD
+        value: "true"
+      - key: EXOTEL_TIME_LIMIT
+        value: "1800"
+      - key: AI_PROVIDER
+        value: "gemini"
+      - key: GEMINI_LIVE_MODEL
+        value: "gemini-3.1-flash-live-preview"
+      - key: GEMINI_TEXT_MODEL
+        value: "gemini-3.1-flash-lite"
+      - key: GEMINI_VOICE
+        value: "Kore"
+      - key: SEND_TEST_TONE
+        value: "false"
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        sync: false
+      - key: EXOTEL_ACCOUNT_SID
+        sync: false
+      - key: EXOTEL_API_KEY
+        sync: false
+      - key: EXOTEL_API_TOKEN
+        sync: false
+      - key: EXOTEL_CALLER_ID
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: PUBLIC_BASE_URL
+        sync: false
