@@ -1,0 +1,28 @@
+services:
+  web:
+    build: .
+    env_file: .env
+    environment:
+      PORT: 8000
+      DATABASE_URL: postgresql://vardha:vardha_local@db:5432/vardha_voice_connect
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: vardha_voice_connect
+      POSTGRES_USER: vardha
+      POSTGRES_PASSWORD: vardha_local
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vardha -d vardha_voice_connect"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - vardha_postgres_data:/var/lib/postgresql/data
+
+volumes:
+  vardha_postgres_data:

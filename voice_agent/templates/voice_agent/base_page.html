@@ -1,0 +1,126 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>{{ app_name }} | v{{ app_version }}</title>
+  <link rel="icon" type="image/svg+xml" href="{% static 'favicon.svg' %}">
+  <link rel="stylesheet" href="{% static 'voice_agent/styles.css' %}?v={{ app_version }}">
+</head>
+<meta name="csrf-token" content="{{ csrf_token }}">
+<body data-page="{{ page }}" data-call-id="{{ call_id|default:'' }}">
+  <div class="mobile-nav-backdrop" id="mobileNavBackdrop"></div>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar">
+      <button class="mobile-menu-close" id="mobileMenuClose" type="button" aria-label="Close menu">×</button>
+      <div class="brand">
+        <div class="brand-mark">V</div>
+        <div><div class="brand-name">Vardha Voice<br>Connect</div><div class="brand-sub">Simple AI voice calling</div></div>
+      </div>
+      <nav class="nav">
+        <a class="nav-item {% if active == 'dashboard' %}active{% endif %}" data-nav-link href="/">Dashboard</a>
+        <a class="nav-item {% if active == 'call' %}active{% endif %}" data-nav-link href="/call">Call someone</a>
+        <a class="nav-item {% if active == 'knowledge' %}active{% endif %}" data-nav-link href="/knowledge">Business information</a>
+        <a class="nav-item {% if active == 'history' %}active{% endif %}" data-nav-link href="/history">Call history</a>
+      </nav>
+      <div class="sidebar-footer"><strong>Vardha Group</strong><span>Vardha Voice Connect v{{ app_version }}</span></div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div class="mobile-brand">
+          <div class="mobile-brand-mark">V</div>
+          <div class="mobile-brand-text">
+            <strong>Vardha Voice Connect</strong>
+            <span>Simple AI voice calling</span>
+          </div>
+        </div>
+        <div class="top-title">Vardha Voice Connect — AI Voice Calling Agent</div>
+        <div class="provider"><span class="dot" id="healthDot"></span><span id="healthText">Checking service</span></div>
+        <button class="mobile-menu-open" id="mobileMenuOpen" type="button" aria-label="Open navigation menu" aria-expanded="false">
+          <span></span><span></span><span></span>
+        </button>
+      </header>
+
+      {% if page == 'dashboard' %}
+      <section class="content">
+        <div class="eyebrow">VARDHA VOICE CONNECT</div>
+        <h1>AI calling workspace</h1>
+        <p class="lead">Place a call, let the AI talk naturally, and review the result in one simple workspace.</p>
+        <div class="grid three">
+          <div class="card stat"><div class="label">Provider</div><div class="big">Exotel</div><div class="muted">Outbound voice + AgentStream</div></div>
+          <div class="card stat"><div class="label">AI</div><div class="big">OpenAI Realtime</div><div class="muted">Speech-to-speech conversation</div></div>
+          <div class="card stat"><div class="label">Knowledge Base</div><div class="big" id="kbCount">—</div><div class="muted">Active facts available to AI</div></div>
+        </div>
+        <div class="grid two">
+          <div class="card"><h3>How the call works</h3><p>Enter a mobile number, place the call, let the person answer, and the AI will introduce itself, listen, answer from the Knowledge Base, and close the call politely.</p><div class="flow">Number <span>→</span> Call <span>→</span> AI Conversation <span>→</span> Recording <span>→</span> Summary</div></div>
+          <div class="card"><h3>Knowledge policy</h3><p>The AI only uses active business information saved in the Knowledge Base. If a fact is missing, it says so politely instead of guessing.</p></div>
+        </div>
+      </section>
+      {% elif page == 'call' %}
+      <section class="content">
+        <div class="eyebrow">CALL SOMEONE</div>
+        <h1>Make an outbound call</h1>
+        <p class="lead">Enter a mobile number in international format. During Exotel trial testing, the destination number may need to be added and verified before the provider allows the call.</p>
+        <div class="call-layout">
+          <form class="card call-card" id="callForm">
+            {% csrf_token %}
+            <h3>Call someone</h3>
+            <label>Mobile number</label>
+            <input id="phoneNumber" type="tel" placeholder="+919876543210" autocomplete="tel" required>
+            <button class="primary" type="submit" id="callButton">Call</button>
+            <div id="callSetupHint" class="result setup-hint"></div><div id="callResult" class="result"></div>
+          </form>
+          <div class="card"><h3>Call flow</h3><ol class="steps"><li>Exotel places the call.</li><li>When the person answers, Exotel opens the secure audio stream.</li><li>The AI connects to OpenAI Realtime and gives the company greeting.</li><li>The AI listens and answers factual questions from the active Knowledge Base.</li><li>The call is recorded and the system saves status, transcript, duration and summary.</li></ol></div>
+        </div>
+      </section>
+      {% elif page == 'knowledge' %}
+      <section class="content">
+        <div class="eyebrow">BUSINESS INFORMATION</div>
+        <h1>What the AI can say</h1>
+        <p class="lead">Add short, clear business facts here. The AI uses only these active facts during a call.</p>
+        <div class="kb-grid">
+          <form class="card add-card" id="kbForm">
+            {% csrf_token %}
+            <div class="form-heading">
+              <h3>Add business information</h3>
+              <p class="form-help">Write one useful fact per entry. Simple wording works best.</p>
+            </div>
+            <label for="kbTitle">Topic</label>
+            <input id="kbTitle" required placeholder="Example: About Vardha Group" autocomplete="off">
+            <label for="kbContent">Details</label>
+            <textarea id="kbContent" required placeholder="Example: Vardha Group provides software and technology services."></textarea>
+            <button class="primary add-info-button" type="submit"><span>+ Add information</span></button>
+            <div id="kbResult" class="result"></div>
+          </form>
+          <div class="kb-right">
+            <div class="kb-section-intro">
+              <h3>Saved information</h3>
+              <p>These are the facts currently available to the AI.</p>
+            </div>
+            <div id="kbList" class="kb-list"></div>
+          </div>
+        </div>
+      </section>
+      {% elif page == 'history' %}
+      <section class="content">
+        <div class="eyebrow">CALL HISTORY</div>
+        <h1>Previous calls</h1>
+        <p class="lead">Every call is listed here with its status, duration, recording and summary. Open any row for the full transcript and call details.</p>
+        <div class="history-table-wrap"><table class="history-table"><thead><tr><th>Date &amp; time</th><th>Number</th><th>Status</th><th>Duration</th><th>Recording</th><th>Summary</th><th></th></tr></thead><tbody id="historyList"></tbody></table></div>
+      </section>
+      {% elif page == 'detail' %}
+      <section class="content">
+        <div class="detail-back-row"><a class="back-link" href="/history" data-nav-link aria-label="Back to call history">← Back to Call history</a></div>
+        <div class="eyebrow">CALL DETAILS</div>
+        <h1>Call information</h1>
+        <p class="lead">The complete call record is shown below: provider status, duration, recording, transcript, summary and any error message.</p>
+        <div id="detail" class="detail-grid"></div>
+      </section>
+      {% endif %}
+    </main>
+  </div>
+  <script src="{% static 'voice_agent/app.js' %}?v={{ app_version }}"></script>
+</body>
+</html>

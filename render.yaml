@@ -1,0 +1,47 @@
+services:
+  - type: web
+    name: vardha-voice-connect
+    runtime: docker
+    plan: free
+    healthCheckPath: /api/health
+    envVars:
+      - key: DJANGO_DEBUG
+        value: "false"
+      - key: APP_NAME
+        value: "Vardha Voice Connect — AI Voice Calling Agent"
+      - key: DEFAULT_TIMEZONE
+        value: "Asia/Kolkata"
+      - key: EXOTEL_STREAMTYPE
+        value: "bidirectional"
+      - key: EXOTEL_STREAM_SAMPLE_RATE
+        value: "8000"
+      - key: EXOTEL_STREAM_AUDIO_CONTENT_TYPE
+        value: "audio/x-l16;rate=8000"
+      - key: EXOTEL_RECORD
+        value: "true"
+      - key: EXOTEL_TIME_LIMIT
+        value: "1800"
+      - key: OPENAI_REALTIME_MODEL
+        value: "gpt-realtime"
+      - key: OPENAI_TEXT_MODEL
+        value: "gpt-5.6-luna"
+      - key: OPENAI_VOICE
+        value: "coral"
+      - key: SEND_TEST_TONE
+        value: "false"
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        sync: false
+      - key: EXOTEL_ACCOUNT_SID
+        sync: false
+      - key: EXOTEL_API_KEY
+        sync: false
+      - key: EXOTEL_API_TOKEN
+        sync: false
+      - key: EXOTEL_CALLER_ID
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: PUBLIC_BASE_URL
+        sync: false
