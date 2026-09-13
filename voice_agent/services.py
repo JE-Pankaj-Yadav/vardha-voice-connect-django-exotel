@@ -315,8 +315,87 @@ def generate_summary(call_id):
     call = Call.objects.get(id=call_id)
     if not call.transcript.strip():
         return
+
+    provider = getattr(settings, "AI_PROVIDER", "gemini")
+    if provider == "gemini":
+        if not settings.GEMINI_API_KEY:
+            call.summary = "Summary unavailable because GEMINI_API_KEY is not configured."
+            call.save(update_fields=["summary"])
+            return
+        prompt = f"""Create a concise call summary from this transcript. Return exactly four labeled sections:
+What was discussed:
+What the person asked:
+Their requirements:
+Important points:
+
+Transcript:
+{call.transcript}
+"""
+        try:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{settings.GEMINI_TEXT_MODEL}:generateContent"
+            response = requests.post(
+                url,
+                params={"key": settings.GEMINI_API_KEY},
+                headers={"Content-Type": "application/json"},
+                json={"contents": [{"role": "user", "parts": [{"text": prompt}]}]},
+                timeout=60,
+            )
+            if not response.ok:
+                raise RuntimeError(f"Gemini HTTP {response.status_code}: {response.text[:500]}")
+            payload = response.json()
+            text = ""
+            for candidate in payload.get("candidates", []):
+                for part in ((candidate.get("content") or {}).get("parts") or []):
+                    if part.get("text"):
+                        text += part["text"]
+            text = text.strip()
+            if not text:
+                raise RuntimeError("Gemini returned an empty summary")
+            call.summary = text
+            labels = {
+                "What was discussed:": "discussed",
+                "What the person asked:": "questions",
+                "Their requirements:": "requirements",
+                "Important points:": "important_points",
+            }
+            parsed = {}
+            current = None
+            for line in text.splitlines():
+                stripped = line.strip()
+                if stripped in labels:
+                    current = labels[stripped]
+                    parsed[current] = []
+                elif current:
+                    parsed[current].append(line)
+            for field in labels.values():
+                value = "\n".join(parsed.get(field, [])).strip()
+                if value:
+                    setattr(call, field, value)
+            call.save(update_fields=["summary", "discussed", "questions", "requirements", "important_points"])
+            return
+        except Exception as exc:
+            log.exception("Gemini summary generation failed")
+            person_lines = [line.split(":", 1)[1].strip() for line in call.transcript.splitlines() if line.startswith("Person:") and ":" in line]
+            ai_lines = [line.split(":", 1)[1].strip() for line in call.transcript.splitlines() if line.startswith("AI:") and ":" in line]
+            discussed = " ".join(ai_lines[:3]) or "The conversation was captured in the transcript."
+            questions = " ".join(person_lines[:3]) or "No explicit question was captured."
+            fallback = (
+                f"What was discussed:\n{discussed}\n\n"
+                f"What the person asked:\n{questions}\n\n"
+                f"Their requirements:\n{questions}\n\n"
+                f"Important points:\nGemini summary service was unavailable; see the full transcript. Provider detail: {exc}"
+            )
+            call.summary = fallback[:12000]
+            call.discussed = discussed[:4000]
+            call.questions = questions[:4000]
+            call.requirements = questions[:4000]
+            call.important_points = f"Gemini summary unavailable; transcript retained. {exc}"[:4000]
+            call.save(update_fields=["summary", "discussed", "questions", "requirements", "important_points"])
+            return
+
+    # Optional legacy OpenAI summary path.
     if not settings.OPENAI_API_KEY:
-        call.summary = "Summary unavailable because OPENAI_API_KEY is not configured."
+        call.summary = "Summary unavailable because no configured AI text provider is available."
         call.save(update_fields=["summary"])
         return
     prompt = f"""Create a concise call summary from this transcript. Return exactly four labeled sections:
@@ -340,60 +419,12 @@ Transcript:
         payload = response.json()
         text = payload.get("output_text", "") or ""
         if not text:
-            chunks = []
-            for item in payload.get("output", []):
-                for content in item.get("content", []):
-                    if content.get("type") in {"output_text", "text"}:
-                        chunks.append(content.get("text", ""))
-            text = "\n".join(chunks)
-        text = text.strip()
-        if not text:
             raise RuntimeError("OpenAI returned an empty summary")
-        call.summary = text
-        # Keep the four assignment fields synchronized when the model follows
-        # the requested labels. The full formatted summary remains authoritative.
-        labels = {
-            "What was discussed:": "discussed",
-            "What the person asked:": "questions",
-            "Their requirements:": "requirements",
-            "Important points:": "important_points",
-        }
-        parsed = {}
-        current = None
-        for line in text.splitlines():
-            stripped = line.strip()
-            if stripped in labels:
-                current = labels[stripped]
-                parsed[current] = []
-            elif current:
-                parsed[current].append(line)
-        for field in labels.values():
-            value = "\n".join(parsed.get(field, [])).strip()
-            if value:
-                setattr(call, field, value)
-        call.save(update_fields=["summary", "discussed", "questions", "requirements", "important_points"])
+        call.summary = text.strip()
+        call.save(update_fields=["summary"])
     except Exception as exc:
-        log.exception("Summary generation failed")
-        # Never leave the required summary section empty solely because the
-        # text-model endpoint failed. Provide a deterministic transcript-based
-        # fallback and keep the provider error in important points.
-        person_lines = [line.split(":", 1)[1].strip() for line in call.transcript.splitlines() if line.startswith("Person:") and ":" in line]
-        ai_lines = [line.split(":", 1)[1].strip() for line in call.transcript.splitlines() if line.startswith("AI:") and ":" in line]
-        discussed = " ".join(ai_lines[:3]) or "The conversation was captured in the transcript."
-        questions = " ".join(person_lines[:3]) or "No explicit question was captured."
-        fallback = (
-            f"What was discussed:\n{discussed}\n\n"
-            f"What the person asked:\n{questions}\n\n"
-            f"Their requirements:\n{questions}\n\n"
-            f"Important points:\nSummary model was unavailable; see the full transcript. Provider detail: {exc}"
-        )
-        call.summary = fallback[:12000]
-        call.discussed = discussed[:4000]
-        call.questions = questions[:4000]
-        call.requirements = questions[:4000]
-        call.important_points = f"Summary model unavailable; transcript retained. {exc}"[:4000]
-        call.save(update_fields=["summary", "discussed", "questions", "requirements", "important_points"])
-
+        call.summary = f"Summary model unavailable. See the transcript. Provider detail: {exc}"[:12000]
+        call.save(update_fields=["summary"])
 
 def normalize_exotel_status(raw):
     value = str(raw or "").lower().replace(" ", "_")

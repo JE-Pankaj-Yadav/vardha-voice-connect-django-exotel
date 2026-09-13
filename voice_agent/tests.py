@@ -56,7 +56,7 @@ class PageSmokeTests(TestCase):
 
 
     @patch("voice_agent.services.requests.post")
-    @patch("voice_agent.views.settings.OPENAI_API_KEY", "test-openai-key")
+    @patch("voice_agent.views.settings.GEMINI_API_KEY", "test-gemini-key")
     @patch("voice_agent.services.settings.EXOTEL_CALLER_ID", "08047283507")
     @patch("voice_agent.services.settings.EXOTEL_API_TOKEN", "test-token")
     @patch("voice_agent.services.settings.EXOTEL_API_KEY", "test-key")
@@ -84,7 +84,7 @@ class PageSmokeTests(TestCase):
         self.assertTrue(sent_payload["StreamUrl"].startswith("wss://"))
 
     @patch("voice_agent.services.requests.post")
-    @patch("voice_agent.views.settings.OPENAI_API_KEY", "test-openai-key")
+    @patch("voice_agent.views.settings.GEMINI_API_KEY", "test-gemini-key")
     @patch("voice_agent.services.settings.EXOTEL_CALLER_ID", "08047283507")
     @patch("voice_agent.services.settings.EXOTEL_API_TOKEN", "test-token")
     @patch("voice_agent.services.settings.EXOTEL_API_KEY", "test-key")
@@ -123,7 +123,7 @@ class AudioBridgeTests(TestCase):
     def test_service_worker_cache_version(self):
         response = self.client.get('/service-worker.js')
         self.assertEqual(response.status_code, 200)
-        self.assertIn('vvc-v1-0', response.content.decode())
+        self.assertIn('vvc-v1-1', response.content.decode())
 
 
 class AudioProtocolRegressionTests(TestCase):
@@ -138,7 +138,7 @@ class AudioProtocolRegressionTests(TestCase):
     def test_realtime_session_requests_audio_output(self):
         from pathlib import Path
         source = Path(__file__).with_name("consumers.py").read_text()
-        self.assertIn('"output_modalities": ["audio"]', source)
+        self.assertIn('"responseModalities": ["AUDIO"]', source)
 
     def test_exotel_outbound_media_uses_streamSid_protocol_key(self):
         from pathlib import Path

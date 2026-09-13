@@ -25,7 +25,7 @@ def page_context(active):
 
 def service_worker(request):
     """Serve the navigation service worker from the site root so it can cover /call, /knowledge, etc."""
-    js = """const CACHE = 'vvc-v1-0';
+    js = """const CACHE = 'vvc-v1-1';
 const APP_ROUTES = ['/', '/call', '/knowledge', '/history'];
 
 self.addEventListener('install', event => {
@@ -145,7 +145,9 @@ def api_health(request):
         if public_wss_ready
         else "Public WSS is not configured. Exotel cannot connect to localhost; set PUBLIC_BASE_URL to a real HTTPS tunnel URL."
     )
-    ready = (not missing_exotel) and bool(settings.OPENAI_API_KEY) and public_wss_ready
+    ai_provider = getattr(settings, "AI_PROVIDER", "gemini")
+    ai_key_configured = bool(settings.GEMINI_API_KEY) if ai_provider == "gemini" else bool(settings.OPENAI_API_KEY)
+    ready = (not missing_exotel) and ai_key_configured and public_wss_ready
     return JsonResponse({
         "ok": True,
         "ready": ready and database_ready,
@@ -161,6 +163,10 @@ def api_health(request):
         "exotel_domain_warning": domain_warning,
         "exotel_account_sid_configured": bool(sid),
         "exotel_account_sid_preview": ("*" * max(0, len(sid) - 4) + sid[-4:]) if sid else "",
+        "ai_provider": ai_provider,
+        "ai_configured": ai_key_configured,
+        "gemini_configured": bool(settings.GEMINI_API_KEY),
+        "gemini_live_model": settings.GEMINI_LIVE_MODEL,
         "openai_configured": bool(settings.OPENAI_API_KEY),
         "public_base_url": public_base,
         "public_wss_ready": public_wss_ready,
@@ -182,8 +188,11 @@ def api_make_call(request):
     phone = str(body.get("phone_number", "")).strip()
     if not phone.startswith("+") or len(phone) < 10 or len(phone) > 16:
         return JsonResponse({"error": "Enter a valid mobile number in international format, e.g. +919876543210."}, status=400)
-    if not settings.OPENAI_API_KEY:
-        return JsonResponse({"error": "OPENAI_API_KEY is missing. Add it to .env and restart."}, status=400)
+    ai_provider = getattr(settings, "AI_PROVIDER", "gemini")
+    if ai_provider == "gemini" and not settings.GEMINI_API_KEY:
+        return JsonResponse({"error": "GEMINI_API_KEY is missing. Add it to Render Environment or .env and restart."}, status=400)
+    if ai_provider != "gemini" and not settings.OPENAI_API_KEY:
+        return JsonResponse({"error": "OPENAI_API_KEY is missing for the selected AI provider."}, status=400)
     with transaction.atomic():
         call = Call.objects.create(phone_number=phone)
         try:

@@ -156,6 +156,13 @@ EXOTEL_STREAMTYPE = os.getenv("EXOTEL_STREAMTYPE", "bidirectional")
 EXOTEL_STREAM_SAMPLE_RATE = 8000
 EXOTEL_RECORD = os.getenv("EXOTEL_RECORD", "true").lower() == "true"
 EXOTEL_TIME_LIMIT = int(os.getenv("EXOTEL_TIME_LIMIT", "1800"))
+AI_PROVIDER = os.getenv("AI_PROVIDER", "gemini").strip().lower() or "gemini"
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
+GEMINI_LIVE_MODEL = os.getenv("GEMINI_LIVE_MODEL", "gemini-3.1-flash-live-preview").strip()
+GEMINI_TEXT_MODEL = os.getenv("GEMINI_TEXT_MODEL", "gemini-3.1-flash-lite").strip()
+GEMINI_VOICE = os.getenv("GEMINI_VOICE", "Kore").strip()
+
+# Optional legacy OpenAI settings. They remain available for future provider fallback.
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 OPENAI_REALTIME_MODEL = os.getenv("OPENAI_REALTIME_MODEL", "gpt-realtime")
 OPENAI_TEXT_MODEL = os.getenv("OPENAI_TEXT_MODEL", "gpt-5.6-luna")

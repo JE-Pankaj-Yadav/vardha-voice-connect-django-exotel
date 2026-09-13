@@ -116,12 +116,12 @@ async function health() {
     const h = await api('/api/health');
     const ok = Boolean(h.ready);
     serviceReady = ok;
-    if ($('healthText')) $('healthText').textContent = ok ? 'Ready for real call' : (h.public_wss_ready ? 'Provider configuration needed' : 'Public WSS required');
+    if ($('healthText')) $('healthText').textContent = ok ? `Ready for real call · ${h.ai_provider === 'gemini' ? 'Gemini Live' : h.ai_provider}` : (h.public_wss_ready ? (h.ai_configured ? 'Provider configuration needed' : `${h.ai_provider === 'gemini' ? 'Gemini API key' : 'AI provider'} required`) : 'Public WSS required');
     if ($('healthDot')) $('healthDot').style.background = ok ? '#41a46e' : '#d08a3e';
     const callButton = $('callButton');
     if (callButton && !ok) callButton.disabled = true;
     const callHint = $('callSetupHint');
-    if (callHint && !ok) callHint.textContent = h.public_wss_message || 'Public WSS is required before a real call can be placed.';
+    if (callHint && !ok) callHint.textContent = h.public_wss_message || (!h.ai_configured ? `Configure ${h.ai_provider === 'gemini' ? 'GEMINI_API_KEY' : 'the AI provider key'} before placing a real call.` : 'Provider configuration is required before a real call can be placed.');
   } catch (err) {
     if ($('healthText')) $('healthText').textContent = 'Service check failed';
     if ($('healthDot')) $('healthDot').style.background = '#a33b3b';
