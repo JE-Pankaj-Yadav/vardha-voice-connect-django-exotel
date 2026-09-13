@@ -123,7 +123,7 @@ class AudioBridgeTests(TestCase):
     def test_service_worker_cache_version(self):
         response = self.client.get('/service-worker.js')
         self.assertEqual(response.status_code, 200)
-        self.assertIn('vvc-v1-1', response.content.decode())
+        self.assertIn('vvc-v1-2-0', response.content.decode())
 
 
 class AudioProtocolRegressionTests(TestCase):
@@ -139,6 +139,7 @@ class AudioProtocolRegressionTests(TestCase):
         from pathlib import Path
         source = Path(__file__).with_name("consumers.py").read_text()
         self.assertIn('"responseModalities": ["AUDIO"]', source)
+        self.assertIn('"generationConfig"', source)
 
     def test_exotel_outbound_media_uses_streamSid_protocol_key(self):
         from pathlib import Path
@@ -160,3 +161,29 @@ class AudioProtocolRegressionTests(TestCase):
                     make_stream_url(42),
                     "wss://vardha-voice-connect.onrender.com/ws/exotel/42/?v=2&sample-rate=8000",
                 )
+
+
+class GeminiLiveRegressionTests(TestCase):
+    def test_system_instructions_is_called_off_async_orm_context(self):
+        from pathlib import Path
+        source = Path(__file__).with_name("consumers.py").read_text()
+        self.assertIn("await sync_to_async(system_instructions, thread_sensitive=True)()", source)
+        self.assertIn("_flush_pending_input", source)
+        self.assertIn("_watch_greeting_audio", source)
+        self.assertNotIn('"systemInstruction": {"parts": [{"text": system_instructions()}]}', source)
+
+    def test_ai_failure_is_preserved_when_exotel_reports_completed(self):
+        from .models import Call
+        call = Call.objects.create(
+            phone_number="+918127942905",
+            exotel_sid="test-sid",
+            error_message="Gemini Live connection failed: test",
+            status="IN_PROGRESS",
+        )
+        response = self.client.post(
+            "/webhooks/exotel/status",
+            data={"CallSid": "test-sid", "Status": "completed"},
+        )
+        self.assertEqual(response.status_code, 200)
+        call.refresh_from_db()
+        self.assertEqual(call.status, "FAILED")

@@ -53,6 +53,10 @@ class ExotelMediaConsumer(AsyncWebsocketConsumer):
         self._outbound_rate_state = None
         self._inbound_rate_state = None
         self._outbound_seq = 0
+        self._pending_input_pcm16 = bytearray()
+        self._pending_input_max_bytes = self.GEMINI_INPUT_PCM_RATE * 2 * 3  # 3s safety buffer
+        self._gemini_setup_watchdog_task = None
+        self._greeting_watchdog_task = None
         self._outbound_drain_task = None
         self._outbound_pace_seconds = self.EXOTEL_FRAME_MS / 1000.0
         self._first_media_logged = False
@@ -112,7 +116,7 @@ class ExotelMediaConsumer(AsyncWebsocketConsumer):
         if event == "media":
             media = data.get("media") or {}
             payload = media.get("payload") or media.get("Payload")
-            if not payload or not self.gemini_ws or not self._gemini_ready.is_set():
+            if not payload:
                 return
             try:
                 raw_audio = base64.b64decode(payload)
@@ -132,14 +136,16 @@ class ExotelMediaConsumer(AsyncWebsocketConsumer):
                         pcm_native, 2, 1, self._exotel_sample_rate,
                         self.GEMINI_INPUT_PCM_RATE, self._inbound_rate_state,
                     )
-                await self.gemini_ws.send(json.dumps({
-                    "realtimeInput": {
-                        "audio": {
-                            "data": base64.b64encode(pcm16).decode("ascii"),
-                            "mimeType": f"audio/pcm;rate={self.GEMINI_INPUT_PCM_RATE}",
-                        }
-                    }
-                }))
+                if not self.gemini_ws or not self._gemini_ready.is_set():
+                    # Exotel can start sending media before Gemini returns setupComplete.
+                    # Do not silently discard the caller's first words; keep a small bounded
+                    # buffer and flush it immediately after Gemini becomes ready.
+                    self._pending_input_pcm16.extend(pcm16)
+                    if len(self._pending_input_pcm16) > self._pending_input_max_bytes:
+                        overflow = len(self._pending_input_pcm16) - self._pending_input_max_bytes
+                        del self._pending_input_pcm16[:overflow]
+                    return
+                await self._send_pcm_to_gemini(pcm16)
             except Exception as exc:
                 self._ai_failed = True
                 await sync_to_async(self._set_error)(f"Gemini input audio processing failed: {self._friendly_ai_error(exc)}")
@@ -168,6 +174,12 @@ class ExotelMediaConsumer(AsyncWebsocketConsumer):
             return
 
         try:
+            # Django ORM access is synchronous. Load the Knowledge Base before
+            # opening the provider session and do it off the ASGI event loop.
+            # This fixes the production error: "You cannot call this from an
+            # async context - use a thread or sync_to_async."
+            instructions = await sync_to_async(system_instructions, thread_sensitive=True)()
+
             url = (
                 "wss://generativelanguage.googleapis.com/ws/"
                 "google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent"
@@ -185,25 +197,29 @@ class ExotelMediaConsumer(AsyncWebsocketConsumer):
             setup = {
                 "setup": {
                     "model": f"models/{settings.GEMINI_LIVE_MODEL}",
-                    "responseModalities": ["AUDIO"],
-                    "systemInstruction": {"parts": [{"text": system_instructions()}]},
+                    "generationConfig": {
+                        "responseModalities": ["AUDIO"],
+                        "speechConfig": {
+                            "voiceConfig": {
+                                "prebuiltVoiceConfig": {"voiceName": settings.GEMINI_VOICE}
+                            }
+                        },
+                        "temperature": 0.4,
+                    },
+                    "systemInstruction": {"parts": [{"text": instructions}]},
                     "inputAudioTranscription": {},
                     "outputAudioTranscription": {},
-                    "speechConfig": {
-                        "voiceConfig": {
-                            "prebuiltVoiceConfig": {"voiceName": settings.GEMINI_VOICE}
-                        }
-                    },
                     "realtimeInputConfig": {
                         "automaticActivityDetection": {
                             "disabled": False,
-                            "prefixPaddingMs": 200,
-                            "silenceDurationMs": 500,
+                            "prefixPaddingMs": 250,
+                            "silenceDurationMs": 700,
                         }
                     },
                 }
             }
             await self.gemini_ws.send(json.dumps(setup))
+            self._gemini_setup_watchdog_task = asyncio.create_task(self._watch_gemini_setup())
             log.info(
                 "Gemini Live connected; waiting for setupComplete | call_id=%s | model=%s",
                 self.call_id, settings.GEMINI_LIVE_MODEL,
@@ -235,11 +251,63 @@ class ExotelMediaConsumer(AsyncWebsocketConsumer):
                     "turnComplete": True,
                 }
             }))
+            self._greeting_watchdog_task = asyncio.create_task(self._watch_greeting_audio())
             log.info("Gemini greeting requested | call_id=%s | stream_sid=%s", self.call_id, self.stream_sid)
         except Exception as exc:
             self._ai_failed = True
             await sync_to_async(self._set_error)(f"Gemini greeting failed: {self._friendly_ai_error(exc)}")
             log.exception("Gemini greeting failed | call_id=%s", self.call_id)
+
+    async def _send_pcm_to_gemini(self, pcm16):
+        if not self.gemini_ws or not self._gemini_ready.is_set() or not pcm16:
+            return
+        await self.gemini_ws.send(json.dumps({
+            "realtimeInput": {
+                "audio": {
+                    "data": base64.b64encode(pcm16).decode("ascii"),
+                    "mimeType": f"audio/pcm;rate={self.GEMINI_INPUT_PCM_RATE}",
+                }
+            }
+        }))
+
+    async def _flush_pending_input(self):
+        if not self._pending_input_pcm16 or not self._gemini_ready.is_set():
+            return
+        buffered = bytes(self._pending_input_pcm16)
+        self._pending_input_pcm16.clear()
+        # Keep frames reasonably sized for the Live API instead of sending one large blob.
+        frame_bytes = int(self.GEMINI_INPUT_PCM_RATE * 2 * 0.1)
+        for offset in range(0, len(buffered), frame_bytes):
+            await self._send_pcm_to_gemini(buffered[offset:offset + frame_bytes])
+        log.info("Flushed buffered caller audio to Gemini | call_id=%s | bytes=%s", self.call_id, len(buffered))
+
+    async def _watch_gemini_setup(self):
+        try:
+            await asyncio.sleep(12)
+            if not self._finished and not self._gemini_ready.is_set():
+                self._ai_failed = True
+                message = (
+                    "Gemini Live did not return setupComplete within 12 seconds. "
+                    "Check GEMINI_API_KEY, the Live model, Google AI Studio quota, and Render outbound WebSocket connectivity."
+                )
+                await sync_to_async(self._set_error)(message)
+                log.error("Gemini setup timeout | call_id=%s", self.call_id)
+        except asyncio.CancelledError:
+            raise
+
+    async def _watch_greeting_audio(self):
+        try:
+            await asyncio.sleep(10)
+            if not self._finished and self._gemini_ready.is_set() and not self._gemini_audio_seen:
+                self._ai_failed = True
+                message = (
+                    "Gemini Live connected and setup completed, but no AI audio was received within 10 seconds. "
+                    "Check Gemini Live model/quota and inspect Render logs for 'FIRST GEMINI AUDIO SENT'."
+                )
+                await sync_to_async(self._set_error)(message)
+                log.error("Gemini produced no audio after greeting | call_id=%s", self.call_id)
+        except asyncio.CancelledError:
+            raise
 
     async def read_gemini(self):
         try:
@@ -247,8 +315,11 @@ class ExotelMediaConsumer(AsyncWebsocketConsumer):
                 data = json.loads(raw)
                 if data.get("setupComplete") is not None:
                     self._gemini_ready.set()
+                    if self._gemini_setup_watchdog_task and not self._gemini_setup_watchdog_task.done():
+                        self._gemini_setup_watchdog_task.cancel()
                     log.info("Gemini setupComplete | call_id=%s", self.call_id)
                     await self._maybe_send_greeting()
+                    await self._flush_pending_input()
                     continue
 
                 if data.get("error"):
@@ -270,7 +341,13 @@ class ExotelMediaConsumer(AsyncWebsocketConsumer):
                     audio_b64 = inline.get("data")
                     if audio_b64:
                         self._gemini_audio_seen = True
+                        if self._greeting_watchdog_task and not self._greeting_watchdog_task.done():
+                            self._greeting_watchdog_task.cancel()
                         await self._queue_gemini_audio(audio_b64)
+
+                interim_tx = server.get("interimInputTranscription") or {}
+                if interim_tx.get("text"):
+                    log.debug("Gemini interim input transcription | call_id=%s | text=%s", self.call_id, interim_tx["text"].strip())
 
                 input_tx = server.get("inputTranscription") or {}
                 if input_tx.get("text"):
@@ -414,8 +491,9 @@ class ExotelMediaConsumer(AsyncWebsocketConsumer):
         if self._finished:
             return
         self._finished = True
-        if self.reader_task and self.reader_task is not asyncio.current_task():
-            self.reader_task.cancel()
+        for task in (self.reader_task, self._gemini_setup_watchdog_task, self._greeting_watchdog_task, self._outbound_drain_task):
+            if task and task is not asyncio.current_task() and not task.done():
+                task.cancel()
         if self.gemini_ws:
             try:
                 await self.gemini_ws.close()

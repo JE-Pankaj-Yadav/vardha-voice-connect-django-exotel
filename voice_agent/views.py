@@ -25,7 +25,7 @@ def page_context(active):
 
 def service_worker(request):
     """Serve the navigation service worker from the site root so it can cover /call, /knowledge, etc."""
-    js = """const CACHE = 'vvc-v1-1';
+    js = """const CACHE = 'vvc-v1-2-0';
 const APP_ROUTES = ['/', '/call', '/knowledge', '/history'];
 
 self.addEventListener('install', event => {
@@ -147,7 +147,8 @@ def api_health(request):
     )
     ai_provider = getattr(settings, "AI_PROVIDER", "gemini")
     ai_key_configured = bool(settings.GEMINI_API_KEY) if ai_provider == "gemini" else bool(settings.OPENAI_API_KEY)
-    ready = (not missing_exotel) and ai_key_configured and public_wss_ready
+    active_knowledge_count = KnowledgeItem.objects.filter(active=True).count()
+    ready = (not missing_exotel) and ai_key_configured and public_wss_ready and database_ready and active_knowledge_count > 0
     return JsonResponse({
         "ok": True,
         "ready": ready and database_ready,
@@ -166,6 +167,9 @@ def api_health(request):
         "ai_provider": ai_provider,
         "ai_configured": ai_key_configured,
         "gemini_configured": bool(settings.GEMINI_API_KEY),
+        "gemini_live_ready": ai_provider == "gemini" and bool(settings.GEMINI_API_KEY),
+        "knowledge_base_ready": active_knowledge_count > 0,
+        "active_knowledge_items": active_knowledge_count,
         "gemini_live_model": settings.GEMINI_LIVE_MODEL,
         "openai_configured": bool(settings.OPENAI_API_KEY),
         "public_base_url": public_base,
@@ -302,7 +306,13 @@ def exotel_passthru(request):
 
     changed = False
     if mapped:
-        call.status = mapped
+        # Exotel can report COMPLETED after the media bridge has already failed.
+        # Preserve the application-level AI failure so the call history reflects
+        # the real outcome instead of hiding it behind provider COMPLETED.
+        if mapped == "COMPLETED" and call.error_message and call.error_message.lower().startswith(("gemini", "outbound exotel audio", "summary generation")):
+            call.status = "FAILED"
+        else:
+            call.status = mapped
         changed = True
         if mapped == "ANSWERED" and not call.answered_at:
             call.answered_at = timezone.now()
@@ -409,7 +419,10 @@ def exotel_status_callback(request):
         return JsonResponse({"ok": True, "ignored": "unknown sid"})
     mapped = normalize_exotel_status(status_raw)
     if mapped:
-        call.status = mapped
+        if mapped == "COMPLETED" and call.error_message and call.error_message.lower().startswith(("gemini", "outbound exotel audio", "summary generation")):
+            call.status = "FAILED"
+        else:
+            call.status = mapped
         if mapped == "ANSWERED":
             call.answered_at = timezone.now()
         if mapped in {"COMPLETED", "FAILED", "BUSY", "NO_ANSWER", "CANCELED"}:

@@ -91,7 +91,7 @@ ASGI_THREADS = 4
 CHANNEL_LAYERS = {"default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}}
 
 APP_NAME = os.getenv("APP_NAME", "Vardha Voice Connect — AI Voice Calling Agent")
-APP_VERSION = os.getenv("APP_VERSION", "1.0")
+APP_VERSION = os.getenv("APP_VERSION", "1.2.0")
 PUBLIC_BASE_URL = os.getenv("PUBLIC_BASE_URL", "").strip().strip('"').strip("'").rstrip("/")
 # On Render, use the hostname assigned to the web service unless a custom
 # PUBLIC_BASE_URL is explicitly supplied. This removes the localhost/WSS
@@ -153,7 +153,9 @@ EXOTEL_API_BASE_WAS_OVERRIDDEN = bool(_configured_exotel_base and _configured_ex
 
 EXOTEL_STREAM_AUDIO_CONTENT_TYPE = os.getenv("EXOTEL_STREAM_AUDIO_CONTENT_TYPE", "audio/x-l16;rate=8000")
 EXOTEL_STREAMTYPE = os.getenv("EXOTEL_STREAMTYPE", "bidirectional")
-EXOTEL_STREAM_SAMPLE_RATE = 8000
+EXOTEL_STREAM_SAMPLE_RATE = int(os.getenv("EXOTEL_STREAM_SAMPLE_RATE", "8000"))
+if EXOTEL_STREAM_SAMPLE_RATE not in {8000, 16000, 24000}:
+    EXOTEL_STREAM_SAMPLE_RATE = 8000
 EXOTEL_RECORD = os.getenv("EXOTEL_RECORD", "true").lower() == "true"
 EXOTEL_TIME_LIMIT = int(os.getenv("EXOTEL_TIME_LIMIT", "1800"))
 AI_PROVIDER = os.getenv("AI_PROVIDER", "gemini").strip().lower() or "gemini"
