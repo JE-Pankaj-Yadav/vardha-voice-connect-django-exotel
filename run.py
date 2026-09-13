@@ -18,7 +18,7 @@ def run(*args):
 
 def main():
     print("=" * 72)
-    print("VARDHA VOICE CONNECT — AI VOICE CALLING AGENT v1.0")
+    print("VARDHA VOICE CONNECT — AI VOICE CALLING AGENT v1.2.1")
     print("Local Windows runner — Python 3.11 / 3.12 / 3.13")
     print("=" * 72)
     if sys.version_info < (3, 11) or sys.version_info >= (3, 14):
@@ -29,7 +29,7 @@ def main():
     if not env_file.exists() and env_example.exists():
         env_file.write_text(env_example.read_text(encoding="utf-8"), encoding="utf-8")
         print("\nCreated .env from .env.example.")
-        print("Add your Exotel and OpenAI values, then restart the runner.\n")
+        print("Add your Exotel and Gemini values, then restart the runner.\n")
 
     if not PY.exists():
         print("Creating isolated virtual environment: .venv")
