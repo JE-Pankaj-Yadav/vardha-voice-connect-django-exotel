@@ -85,3 +85,45 @@ body.mobile-nav-open{overflow:hidden}
 @media(max-width:820px){.history-table{min-width:860px}.history-table-wrap{margin-right:-4px}.summary-cell{max-width:220px}}
 .summary-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.summary-item{border:1px solid #e8eeea;border-radius:9px;padding:14px;background:#fbfdfc}.summary-item b{display:block;font-size:11px;color:#466055;margin-bottom:6px}.summary-item p{margin:0;color:#64736c;font-size:12px;line-height:1.55;white-space:pre-wrap}.summary-raw{margin-top:14px;color:#466055;font-size:11px}.summary-raw summary{cursor:pointer;font-weight:700}.summary-raw .transcript{margin-top:10px}
 @media(max-width:820px){.summary-grid{grid-template-columns:1fr}}
+
+
+/* Exotel trial/KYC demo notice */
+.trial-notice-backdrop{
+  position:fixed;inset:0;background:rgba(6,29,21,.58);backdrop-filter:blur(3px);
+  z-index:1000;opacity:0;visibility:hidden;transition:opacity .18s ease,visibility .18s ease
+}
+.trial-notice-backdrop.open{opacity:1;visibility:visible}
+.trial-notice{
+  position:fixed;left:50%;top:50%;transform:translate(-50%,-48%);
+  width:min(620px,calc(100vw - 32px));max-height:calc(100vh - 40px);overflow:auto;
+  background:#fff;border:1px solid #dfe8e3;border-radius:16px;
+  box-shadow:0 24px 70px rgba(8,35,25,.24);z-index:1001;padding:26px 28px 28px;
+  opacity:0;visibility:hidden;transition:opacity .18s ease,transform .18s ease,visibility .18s ease
+}
+.trial-notice.open{opacity:1;visibility:visible;transform:translate(-50%,-50%)}
+.trial-notice-close{
+  position:absolute;right:14px;top:12px;width:34px;height:34px;border:1px solid #dce6e1;
+  border-radius:9px;background:#fff;color:#5e6f67;font-size:23px;line-height:1;cursor:pointer
+}
+.trial-notice-close:hover{background:#f3f8f5;color:#123a2d}
+.trial-notice-icon{
+  width:34px;height:34px;border-radius:10px;background:#fff4df;border:1px solid #f0d9aa;
+  color:#9a681c;display:grid;place-items:center;font-weight:850;margin-bottom:12px
+}
+.trial-notice-label{font-size:9px;letter-spacing:1.2px;font-weight:800;color:#6a8177;margin-bottom:5px}
+.trial-notice h2{font-size:21px;line-height:1.2;color:#0b3527;margin:0 42px 9px 0}
+.trial-notice-copy>p{font-size:12px;line-height:1.6;color:#64736c;margin:0}
+.trial-notice-points{margin-top:15px;border:1px solid #e3ebe7;border-radius:11px;background:#f8fbf9;padding:3px 14px}
+.trial-notice-points p{font-size:11px;line-height:1.55;color:#52645c;margin:10px 0}
+.trial-notice-points strong{color:#23483a}
+.trial-notice-foot{
+  margin-top:14px!important;padding:10px 12px;border-radius:8px;background:#f1f7f3;
+  color:#234f3e!important;font-size:11px!important;line-height:1.5!important
+}
+.trial-notice-continue{margin-top:15px;width:100%}
+body.trial-notice-open{overflow:hidden}
+@media(max-width:600px){
+  .trial-notice{padding:22px 20px 22px;border-radius:14px}
+  .trial-notice h2{font-size:19px}
+  .trial-notice-points{padding:2px 12px}
+}

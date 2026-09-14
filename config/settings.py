@@ -91,7 +91,7 @@ ASGI_THREADS = 4
 CHANNEL_LAYERS = {"default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}}
 
 APP_NAME = os.getenv("APP_NAME", "Vardha Voice Connect — AI Voice Calling Agent")
-APP_VERSION = os.getenv("APP_VERSION", "1.2.0")
+APP_VERSION = os.getenv("APP_VERSION", "1.2.1")
 PUBLIC_BASE_URL = os.getenv("PUBLIC_BASE_URL", "").strip().strip('"').strip("'").rstrip("/")
 # On Render, use the hostname assigned to the web service unless a custom
 # PUBLIC_BASE_URL is explicitly supplied. This removes the localhost/WSS

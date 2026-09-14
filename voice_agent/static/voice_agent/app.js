@@ -3,6 +3,45 @@ const callId = document.body.dataset.callId;
 const $ = (id) => document.getElementById(id);
 let serviceReady = false;
 
+
+
+function initTrialNotice() {
+  const modal = $('trialNotice');
+  const backdrop = $('trialNoticeBackdrop');
+  const closeButton = $('trialNoticeClose');
+  const continueButton = $('trialNoticeContinue');
+  if (!modal || !backdrop) return;
+
+  const storageKey = 'vvc_exotel_trial_notice_dismissed_v1';
+  const close = () => {
+    modal.classList.remove('open');
+    backdrop.classList.remove('open');
+    modal.setAttribute('aria-hidden', 'true');
+    modal.hidden = true;
+    document.body.classList.remove('trial-notice-open');
+    localStorage.setItem(storageKey, 'true');
+  };
+
+  const open = () => {
+    modal.hidden = false;
+    modal.setAttribute('aria-hidden', 'false');
+    backdrop.classList.add('open');
+    modal.classList.add('open');
+    document.body.classList.add('trial-notice-open');
+    setTimeout(() => closeButton?.focus(), 0);
+  };
+
+  closeButton?.addEventListener('click', close);
+  continueButton?.addEventListener('click', close);
+  backdrop.addEventListener('click', close);
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape' && modal.classList.contains('open')) close();
+  });
+
+  // Show once per browser/session until the interviewer dismisses it.
+  if (localStorage.getItem(storageKey) !== 'true') open();
+}
+
 function registerNavigationWorker() {
   if (!('serviceWorker' in navigator)) return;
   navigator.serviceWorker.register('/service-worker.js', {scope: '/'})
@@ -295,6 +334,7 @@ async function initDetail() {
 (async () => {
   registerNavigationWorker();
   initNavigation();
+  initTrialNotice();
   await health();
 
   try {

@@ -11,6 +11,23 @@
 <meta name="csrf-token" content="{{ csrf_token }}">
 <body data-page="{{ page }}" data-call-id="{{ call_id|default:'' }}">
   <div class="mobile-nav-backdrop" id="mobileNavBackdrop"></div>
+  <div class="trial-notice-backdrop" id="trialNoticeBackdrop" aria-hidden="true"></div>
+  <section class="trial-notice" id="trialNotice" role="dialog" aria-modal="true" aria-labelledby="trialNoticeTitle" aria-describedby="trialNoticeText" hidden>
+    <button class="trial-notice-close" id="trialNoticeClose" type="button" aria-label="Close trial account notice">×</button>
+    <div class="trial-notice-icon" aria-hidden="true">!</div>
+    <div class="trial-notice-copy">
+      <div class="trial-notice-label">DEMO INFORMATION</div>
+      <h2 id="trialNoticeTitle">Exotel Trial Account Limitation</h2>
+      <p id="trialNoticeText">The project is fully implemented and has been successfully tested. The current Exotel account is still under trial/KYC restriction.</p>
+      <div class="trial-notice-points">
+        <p><strong>Why?</strong> This is a student project. I have a PAN document, but I currently do not have all business documents required for Exotel KYC approval.</p>
+        <p><strong>What does this affect?</strong> Until KYC is approved, Exotel may allow outbound testing only to verified numbers added to the account. Unverified numbers can be rejected by the provider.</p>
+        <p><strong>How can you check the project?</strong> Open <strong>Call History</strong> to see successful test calls, including call details, recording, transcript and AI-generated summary.</p>
+      </div>
+      <p class="trial-notice-foot"><strong>This is an Exotel account restriction, not a project/code limitation.</strong></p>
+      <button class="primary trial-notice-continue" id="trialNoticeContinue" type="button">Got it — Continue to Dashboard</button>
+    </div>
+  </section>
   <div class="app-shell">
     <aside class="sidebar" id="sidebar">
       <button class="mobile-menu-close" id="mobileMenuClose" type="button" aria-label="Close menu">×</button>

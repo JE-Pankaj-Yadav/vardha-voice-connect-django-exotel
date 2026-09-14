@@ -25,7 +25,7 @@ def page_context(active):
 
 def service_worker(request):
     """Serve the navigation service worker from the site root so it can cover /call, /knowledge, etc."""
-    js = """const CACHE = 'vvc-v1-2-0';
+    js = """const CACHE = 'vvc-v1-2-1';
 const APP_ROUTES = ['/', '/call', '/knowledge', '/history'];
 
 self.addEventListener('install', event => {
