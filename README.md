@@ -425,7 +425,7 @@ The application version is sourced only from `VERSION.txt`. Do not set `APP_VERS
 ## v1.4.4 browser rendering fix
 This release makes `VERSION.txt` the sole runtime version source, removes stale application-shell caching from the service worker, and adds a local startup smoke test for HTML/JSON/CSS/JS responses.
 
-## Render public demo (v1.4.6)
+## Render public demo (v1.4.7)
 
 The candidate/demo Render deployment is intentionally public for review. `PUBLIC_DEMO_MODE=true` disables operator Basic Auth even if an older Render environment still contains `ADMIN_AUTH_ENABLED=true`.
 

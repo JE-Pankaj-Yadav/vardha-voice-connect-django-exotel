@@ -1,9 +1,9 @@
-# Vardha Voice Connect v1.4.6 — Verification Report
+# Vardha Voice Connect v1.4.7 — Verification Report
 
 ## Reason for release
 The Render deployment was returning HTTP 503 for normal pages because the deployed runtime was using an older authentication configuration that still treated ADMIN_AUTH_ENABLED=true with missing credentials as a service-unavailable condition.
 
-## v1.4.6 corrections
+## v1.4.7 corrections
 1. Added PUBLIC_DEMO_MODE=true to the Render Blueprint.
 2. Public demo mode takes precedence over ADMIN_AUTH_ENABLED and prevents a stale Render variable from locking the dashboard.
 3. Added migration 0006 to synchronize the Call.status choices, including CANCELED.
