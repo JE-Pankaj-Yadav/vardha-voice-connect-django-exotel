@@ -40,8 +40,9 @@ class AdminBasicAuthMiddleware:
         return hmac.compare_digest(supplied_user, username) and hmac.compare_digest(supplied_password, password)
 
     def __call__(self, request):
+        public_demo = bool(getattr(settings, "PUBLIC_DEMO_MODE", False))
         enabled = bool(getattr(settings, "ADMIN_AUTH_ENABLED", False))
-        if not enabled or request.path.startswith(self.PUBLIC_PREFIXES):
+        if public_demo or not enabled or request.path.startswith(self.PUBLIC_PREFIXES):
             return self.get_response(request)
         if self._authorized(request):
             return self.get_response(request)

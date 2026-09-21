@@ -12,7 +12,7 @@ class KnowledgeItem(models.Model):
     class Meta:
         ordering = ["-updated_at"]
         indexes = [
-            models.Index(fields=["active", "updated_at"]),
+            models.Index(fields=["active", "updated_at"], name="kb_active_updated_idx"),
         ]
 
     def __str__(self):
@@ -52,8 +52,8 @@ class Call(models.Model):
     class Meta:
         ordering = ["-created_at"]
         indexes = [
-            models.Index(fields=["status", "created_at"]),
-            models.Index(fields=["exotel_sid"]),
+            models.Index(fields=["status", "created_at"], name="call_status_created_idx"),
+            models.Index(fields=["exotel_sid"], name="call_exotel_sid_idx"),
         ]
 
     def __str__(self):

@@ -234,7 +234,7 @@ class WebhookAndFrontendRegressionTests(TestCase):
         response = self.client.get("/service-worker.js")
         self.assertEqual(response.status_code, 200)
         self.assertIn("APP_VERSION", response.content.decode())
-        self.assertIn("1.4.4", response.content.decode())
+        self.assertIn(settings.APP_VERSION, response.content.decode())
         self.assertIn("caches.open", response.content.decode())
         self.assertIn("event.respondWith", response.content.decode())
         self.assertIn("/api/", response.content.decode())
@@ -263,6 +263,11 @@ class WebhookAndFrontendRegressionTests(TestCase):
         self.assertIn("method:'DELETE'", js)
         self.assertIn('delete-action', js)
 
+
+    @override_settings(PUBLIC_DEMO_MODE=True, ADMIN_AUTH_ENABLED=True, ADMIN_USERNAME="", ADMIN_PASSWORD="")
+    def test_public_demo_mode_bypasses_stale_admin_auth_flag(self):
+        response = self.client.get("/")
+        self.assertEqual(response.status_code, 200)
 
 class AudioProtocolRegressionTests(TestCase):
     def test_consumer_uses_negotiated_exotel_audio_format(self):
@@ -337,7 +342,7 @@ class ServiceWorkerCacheRegressionTests(TestCase):
         self.assertEqual(response.status_code, 200)
         body = response.content.decode('utf-8')
         self.assertIn("const APP_VERSION =", body)
-        self.assertIn("1.4.4", body)
+        self.assertIn(settings.APP_VERSION, body)
         self.assertIn("caches.open", body)
         self.assertIn("event.respondWith", body)
         self.assertIn("/api/", body)

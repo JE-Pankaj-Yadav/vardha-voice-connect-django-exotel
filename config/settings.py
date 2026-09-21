@@ -130,7 +130,8 @@ if not DEBUG:
 # Optional operator protection. It is intentionally disabled by default so a public demo
 # deployment opens without requiring a username/password. Enable explicitly only when
 # ADMIN_USERNAME and ADMIN_PASSWORD are configured.
-ADMIN_AUTH_ENABLED = os.getenv("ADMIN_AUTH_ENABLED", "false").lower() == "true"
+PUBLIC_DEMO_MODE = os.getenv("PUBLIC_DEMO_MODE", "").lower() == "true"
+ADMIN_AUTH_ENABLED = (os.getenv("ADMIN_AUTH_ENABLED", "false").lower() == "true") and not PUBLIC_DEMO_MODE
 ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "").strip()
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "")
 

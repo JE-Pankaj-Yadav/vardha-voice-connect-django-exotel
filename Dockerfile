@@ -17,4 +17,5 @@ RUN mkdir -p /app/data /app/media /app/staticfiles
 
 EXPOSE 10000
 
-CMD ["sh", "-c", "python manage.py migrate --noinput && python manage.py collectstatic --noinput && daphne -b 0.0.0.0 -p ${PORT:-10000} config.asgi:application"]
+CMD ["sh", "-c", "python manage.py makemigrations --check --dry-run
+python manage.py migrate --noinput && python manage.py collectstatic --noinput && daphne -b 0.0.0.0 -p ${PORT:-10000} config.asgi:application"]

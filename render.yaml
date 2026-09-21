@@ -7,6 +7,8 @@ services:
     envVars:
       - key: DJANGO_DEBUG
         value: "false"
+      - key: PUBLIC_DEMO_MODE
+        value: "true"
       - key: ADMIN_AUTH_ENABLED
         value: "false"
       - key: APP_NAME
