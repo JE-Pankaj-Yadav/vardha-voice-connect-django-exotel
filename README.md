@@ -417,7 +417,7 @@ Authentication is an optional hardening feature. To enable it intentionally, set
 
 ## Release version
 
-Current release: `1.4.8`
+Current release: `1.4.9`
 
 The application version is sourced only from `VERSION.txt`. Do not set `APP_VERSION` in `.env`; existing stale values are ignored.
 
@@ -425,7 +425,7 @@ The application version is sourced only from `VERSION.txt`. Do not set `APP_VERS
 ## v1.4.4 browser rendering fix
 This release makes `VERSION.txt` the sole runtime version source, removes stale application-shell caching from the service worker, and adds a local startup smoke test for HTML/JSON/CSS/JS responses.
 
-## Render public demo (v1.4.8)
+## Render public demo (v1.4.9)
 
 The candidate/demo Render deployment is intentionally public for review. `PUBLIC_DEMO_MODE=true` disables operator Basic Auth even if an older Render environment still contains `ADMIN_AUTH_ENABLED=true`.
 
@@ -434,6 +434,11 @@ For a protected deployment, set `PUBLIC_DEMO_MODE=false`, `ADMIN_AUTH_ENABLED=tr
 The container now runs `python manage.py makemigrations --check --dry-run` before migrations so model drift is detected during deployment.
 
 
-## v1.4.8 migration drift fix
+## v1.4.9 migration drift fix
 
 Added migration `0007_knowledgeitem_provider_checked_at.py` so Render `makemigrations --check --dry-run` no longer detects an unapplied model change for `KnowledgeItem.provider_checked_at`.
+
+
+## v1.4.9 migration fix
+
+Migration `0007_knowledgeitem_provider_checked_at` is idempotent: it records the Django state change while adding `provider_checked_at` only when the PostgreSQL/SQLite table does not already contain the column. This prevents Render upgrades from failing with `DuplicateColumn` when the schema already contains the field but migration history does not.

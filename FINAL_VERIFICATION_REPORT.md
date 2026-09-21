@@ -1,4 +1,4 @@
-# Vardha Voice Connect v1.4.8 — Verification Report
+# Vardha Voice Connect v1.4.9 — Verification Report
 
 ## Reason for release
 The Render deployment was returning HTTP 503 for normal pages because the deployed runtime was using an older authentication configuration that still treated ADMIN_AUTH_ENABLED=true with missing credentials as a service-unavailable condition.
@@ -15,5 +15,10 @@ The Render deployment was returning HTTP 503 for normal pages because the deploy
 Offline artifact environment cannot truthfully run Django integration tests because external package installation is blocked by DNS/network restrictions. The release should therefore be redeployed to Render and verified from the live URL.
 
 
-## v1.4.8 correction
+## v1.4.9 correction
 The Render build log showed `makemigrations --check --dry-run` generating `0007_knowledgeitem_provider_checked_at.py` because the model field existed without a migration. The new migration 0007 is included in this release.
+
+
+## v1.4.9 migration fix
+
+Migration `0007_knowledgeitem_provider_checked_at` is idempotent: it records the Django state change while adding `provider_checked_at` only when the PostgreSQL/SQLite table does not already contain the column. This prevents Render upgrades from failing with `DuplicateColumn` when the schema already contains the field but migration history does not.
