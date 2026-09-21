@@ -417,7 +417,7 @@ Authentication is an optional hardening feature. To enable it intentionally, set
 
 ## Release version
 
-Current release: `1.4.5`
+Current release: `1.4.8`
 
 The application version is sourced only from `VERSION.txt`. Do not set `APP_VERSION` in `.env`; existing stale values are ignored.
 
@@ -425,10 +425,15 @@ The application version is sourced only from `VERSION.txt`. Do not set `APP_VERS
 ## v1.4.4 browser rendering fix
 This release makes `VERSION.txt` the sole runtime version source, removes stale application-shell caching from the service worker, and adds a local startup smoke test for HTML/JSON/CSS/JS responses.
 
-## Render public demo (v1.4.7)
+## Render public demo (v1.4.8)
 
 The candidate/demo Render deployment is intentionally public for review. `PUBLIC_DEMO_MODE=true` disables operator Basic Auth even if an older Render environment still contains `ADMIN_AUTH_ENABLED=true`.
 
 For a protected deployment, set `PUBLIC_DEMO_MODE=false`, `ADMIN_AUTH_ENABLED=true`, and configure `ADMIN_USERNAME`/`ADMIN_PASSWORD`.
 
 The container now runs `python manage.py makemigrations --check --dry-run` before migrations so model drift is detected during deployment.
+
+
+## v1.4.8 migration drift fix
+
+Added migration `0007_knowledgeitem_provider_checked_at.py` so Render `makemigrations --check --dry-run` no longer detects an unapplied model change for `KnowledgeItem.provider_checked_at`.
