@@ -3,7 +3,11 @@ setlocal EnableExtensions EnableDelayedExpansion
 cd /d "%~dp0"
 
 echo ======================================================================
-echo VARDHA VOICE CONNECT 1.0 - Django + Exotel
+set "APP_VERSION=dev"
+if exist "VERSION.txt" (
+    set /p APP_VERSION=<"VERSION.txt"
+)
+echo VARDHA VOICE CONNECT %APP_VERSION% - Django + Exotel + Gemini Live
 echo Python 3.11 / 3.12 / 3.13 isolated environment runner
 echo ======================================================================
 echo.

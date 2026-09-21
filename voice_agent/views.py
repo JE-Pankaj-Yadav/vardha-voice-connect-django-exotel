@@ -14,7 +14,7 @@ from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt, ensure_csrf_cookie
 
 from .models import Call, KnowledgeItem
-from .services import normalize_exotel_status, start_exotel_call, refresh_call_from_exotel
+from .services import normalize_exotel_status, start_exotel_call, refresh_call_from_exotel, ALLOWED_LOGICAL_VOICES
 
 log = logging.getLogger(__name__)
 
@@ -24,63 +24,78 @@ def page_context(active):
 
 
 def service_worker(request):
-    """Serve the navigation service worker from the site root so it can cover /call, /knowledge, etc."""
-    js = """const CACHE = 'vvc-v1-2-1';
-const APP_ROUTES = ['/', '/call', '/knowledge', '/history'];
+    """Serve a versioned network-first worker with a safe offline app shell.
 
-self.addEventListener('install', event => {
+    Dynamic APIs remain network-only. Navigation and static assets use
+    network-first with a versioned cache fallback so mobile/tablet browser
+    testing does not collapse into Chrome's generic offline page after the
+    application has been loaded once online.
+    """
+    version = str(settings.APP_VERSION).strip() or "0.0.0-dev"
+    cache_name = f"vvc-app-shell-{version}"
+    js = f"""const APP_VERSION = {json.dumps(version)};
+const CACHE_NAME = {json.dumps(cache_name)};
+const SHELL = [
+  '/',
+  '/call',
+  '/knowledge',
+  '/history',
+  `/static/voice_agent/styles.css?v=${{encodeURIComponent(APP_VERSION)}}`,
+  `/static/voice_agent/app.js?v=${{encodeURIComponent(APP_VERSION)}}`,
+  '/static/favicon.svg'
+];
+
+self.addEventListener('install', event => {{
   event.waitUntil(
-    caches.open(CACHE)
-      .then(cache => cache.addAll(APP_ROUTES))
+    caches.open(CACHE_NAME)
+      .then(cache => cache.addAll(SHELL))
       .then(() => self.skipWaiting())
   );
-});
+}});
 
-self.addEventListener('activate', event => {
+self.addEventListener('activate', event => {{
   event.waitUntil(
-    caches.keys().then(keys => Promise.all(
-      keys.filter(key => key !== CACHE).map(key => caches.delete(key))
-    )).then(() => self.clients.claim())
+    caches.keys()
+      .then(keys => Promise.all(keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key))))
+      .then(() => self.clients.claim())
   );
-});
+}});
 
-self.addEventListener('fetch', event => {
+self.addEventListener('fetch', event => {{
   const request = event.request;
-  if (request.method !== 'GET' || new URL(request.url).origin !== self.location.origin) return;
-  // Never cache API responses: health, CSRF and call/KB/history data must be live.
-  if (new URL(request.url).pathname.startsWith('/api/')) return;
+  const url = new URL(request.url);
+  if (request.method !== 'GET' || url.origin !== self.location.origin) return;
 
-  // Navigation: prefer the live Django page, but fall back to the cached page
-  // when Chrome/Android is temporarily offline (including DevTools Offline).
-  if (request.mode === 'navigate') {
-    event.respondWith(
-      fetch(request)
-        .then(response => {
-          const copy = response.clone();
-          caches.open(CACHE).then(cache => cache.put(request, copy));
-          return response;
-        })
-        .catch(() => caches.match(request).then(cached => cached || caches.match('/')) )
-    );
-    return;
-  }
+  // Never cache dynamic API/stateful endpoints.
+  if (url.pathname.startsWith('/api/')) return;
 
+  // Network-first for navigation/static assets; fall back to the versioned shell.
   event.respondWith(
-    caches.match(request).then(cached => {
-      if (cached) return cached;
-      return fetch(request).then(response => {
-        if (response.ok) {
+    fetch(request)
+      .then(response => {{
+        if (response && response.ok) {{
           const copy = response.clone();
-          caches.open(CACHE).then(cache => cache.put(request, copy));
-        }
+          caches.open(CACHE_NAME).then(cache => cache.put(request, copy)).catch(() => {{}});
+        }}
         return response;
-      });
-    })
+      }})
+      .catch(() => caches.match(request).then(cached => {{
+        if (cached) return cached;
+        if (request.mode === 'navigate') return caches.match('/');
+        return Response.error();
+      }}))
   );
-});
-"""
-    return HttpResponse(js, content_type="application/javascript; charset=utf-8", headers={"Cache-Control": "no-cache"})
+}});
 
+self.addEventListener('message', event => {{
+  if (event.data?.type === 'SKIP_WAITING') self.skipWaiting();
+}});
+"""
+    return HttpResponse(
+        js,
+        content_type="application/javascript; charset=utf-8",
+        headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"},
+    )
 
 def chrome_devtools_config(request):
     # Chrome DevTools probes this path automatically. It is not an app error.
@@ -149,6 +164,10 @@ def api_health(request):
     ai_key_configured = bool(settings.GEMINI_API_KEY) if ai_provider == "gemini" else bool(settings.OPENAI_API_KEY)
     active_knowledge_count = KnowledgeItem.objects.filter(active=True).count()
     ready = (not missing_exotel) and ai_key_configured and public_wss_ready and database_ready and active_knowledge_count > 0
+    calls_total = Call.objects.count()
+    calls_completed = Call.objects.filter(status="COMPLETED").count()
+    calls_failed = Call.objects.filter(status="FAILED").count()
+    calls_active = Call.objects.filter(status__in={"QUEUED", "RINGING", "ANSWERED", "IN_PROGRESS"}).count()
     return JsonResponse({
         "ok": True,
         "ready": ready and database_ready,
@@ -171,6 +190,15 @@ def api_health(request):
         "knowledge_base_ready": active_knowledge_count > 0,
         "active_knowledge_items": active_knowledge_count,
         "gemini_live_model": settings.GEMINI_LIVE_MODEL,
+        "voice_options": {
+            "primary": settings.GEMINI_VOICE_PRIMARY,
+            "female": settings.GEMINI_VOICE_FEMALE,
+            "allowlist": list(settings.GEMINI_ALLOWED_VOICE_IDS),
+        },
+        "calls_total": calls_total,
+        "calls_completed": calls_completed,
+        "calls_failed": calls_failed,
+        "calls_active": calls_active,
         "openai_configured": bool(settings.OPENAI_API_KEY),
         "public_base_url": public_base,
         "public_wss_ready": public_wss_ready,
@@ -192,6 +220,9 @@ def api_make_call(request):
     phone = str(body.get("phone_number", "")).strip()
     if not phone.startswith("+") or len(phone) < 10 or len(phone) > 16:
         return JsonResponse({"error": "Enter a valid mobile number in international format, e.g. +919876543210."}, status=400)
+    voice_key = str(body.get("voice", "primary") or "primary").strip().lower()
+    if voice_key not in ALLOWED_LOGICAL_VOICES:
+        return JsonResponse({"error": "Invalid voice selection. Choose Main Voice or Female Voice."}, status=400)
     ai_provider = getattr(settings, "AI_PROVIDER", "gemini")
     if ai_provider == "gemini" and not settings.GEMINI_API_KEY:
         return JsonResponse({"error": "GEMINI_API_KEY is missing. Add it to Render Environment or .env and restart."}, status=400)
@@ -200,7 +231,7 @@ def api_make_call(request):
     with transaction.atomic():
         call = Call.objects.create(phone_number=phone)
         try:
-            data = start_exotel_call(call)
+            data = start_exotel_call(call, voice_key=voice_key)
         except Exception as exc:
             call.status = "FAILED"
             call.error_message = str(exc)[:4000]
@@ -220,7 +251,30 @@ def api_make_call(request):
                 or message.startswith("PUBLIC_BASE_URL")
             ) else 502
             return JsonResponse({"error": message, "call_id": call.id}, status=status)
-    return JsonResponse({"ok": True, "call_id": call.id, "sid": call.exotel_sid, "status": call.status, "provider": "Exotel", "provider_response": data})
+    return JsonResponse({"ok": True, "call_id": call.id, "sid": call.exotel_sid, "status": call.status, "provider": "Exotel", "voice": voice_key, "provider_response": data})
+
+
+def api_dashboard(request):
+    if request.method != "GET":
+        return JsonResponse({"error": "GET required"}, status=405)
+    recent = []
+    for call in Call.objects.all()[:6]:
+        recent.append({
+            "id": call.id,
+            "phone_number": call.phone_number,
+            "status": call.status,
+            "duration_seconds": call.duration_seconds,
+            "created_at": call.created_at.isoformat(),
+            "summary": call.summary,
+        })
+    return JsonResponse({
+        "total_calls": Call.objects.count(),
+        "completed_calls": Call.objects.filter(status="COMPLETED").count(),
+        "failed_calls": Call.objects.filter(status="FAILED").count(),
+        "active_calls": Call.objects.filter(status__in={"QUEUED", "RINGING", "ANSWERED", "IN_PROGRESS"}).count(),
+        "knowledge_base_items": KnowledgeItem.objects.filter(active=True).count(),
+        "recent_calls": recent,
+    })
 
 
 def api_knowledge(request):
@@ -388,16 +442,23 @@ def api_call_recording(request, call_id):
         return JsonResponse({"error": f"Recording could not be loaded: {exc}"}, status=502)
 
 def api_call_detail(request, call_id):
-    c = get_object_or_404(Call, id=call_id)
-    if c.exotel_sid:
-        refresh_call_from_exotel(c)
+    call = get_object_or_404(Call, id=call_id)
+    if request.method == "DELETE":
+        deleted_id = call.id
+        call.delete()
+        log.info("Local call history record deleted | call_id=%s", deleted_id)
+        return JsonResponse({"ok": True, "deleted_id": deleted_id})
+    if request.method != "GET":
+        return JsonResponse({"error": "Method not allowed"}, status=405)
+    if call.exotel_sid:
+        refresh_call_from_exotel(call)
     return JsonResponse({
-        "id": c.id, "phone_number": c.phone_number, "sid": c.exotel_sid,
-        "status": c.status, "duration_seconds": c.duration_seconds,
-        "recording_url": (f"/api/call/{c.id}/recording" if c.recording_url else ""), "provider_recording_url": c.recording_url, "transcript": c.transcript,
-        "summary": c.summary, "discussed": c.discussed, "questions": c.questions,
-        "requirements": c.requirements, "important_points": c.important_points,
-        "error_message": c.error_message, "created_at": c.created_at.isoformat(),
+        "id": call.id, "phone_number": call.phone_number, "sid": call.exotel_sid,
+        "status": call.status, "duration_seconds": call.duration_seconds,
+        "recording_url": (f"/api/call/{call.id}/recording" if call.recording_url else ""), "provider_recording_url": call.recording_url, "transcript": call.transcript,
+        "summary": call.summary, "discussed": call.discussed, "questions": call.questions,
+        "requirements": call.requirements, "important_points": call.important_points,
+        "error_message": call.error_message, "created_at": call.created_at.isoformat(),
     })
 
 

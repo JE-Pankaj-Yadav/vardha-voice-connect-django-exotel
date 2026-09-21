@@ -7,10 +7,16 @@ services:
     envVars:
       - key: DJANGO_DEBUG
         value: "false"
+      - key: ADMIN_AUTH_ENABLED
+        value: "true"
+      - key: ADMIN_USERNAME
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
       - key: APP_NAME
         value: "Vardha Voice Connect — AI Voice Calling Agent"
       - key: APP_VERSION
-        value: "1.2.0"
+        value: "1.4.0"
       - key: DEFAULT_TIMEZONE
         value: "Asia/Kolkata"
       - key: EXOTEL_STREAMTYPE
@@ -26,11 +32,19 @@ services:
       - key: AI_PROVIDER
         value: "gemini"
       - key: GEMINI_LIVE_MODEL
-        value: "gemini-3.1-flash-live-preview"
+        value: "gemini-3.8-live"
       - key: GEMINI_TEXT_MODEL
-        value: "gemini-3.1-flash-lite"
+        value: "gemini-3.6-flash"
       - key: GEMINI_VOICE
         value: "Kore"
+      - key: GEMINI_VOICE_PRIMARY
+        value: "Kore"
+      - key: GEMINI_VOICE_FEMALE
+        value: "Aoede"
+      - key: GEMINI_ALLOWED_VOICE_IDS
+        value: "Kore,Aoede"
+      - key: HUMAN_HANDOFF_NUMBER
+        sync: false
       - key: SEND_TEST_TONE
         value: "false"
       - key: DJANGO_SECRET_KEY

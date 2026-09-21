@@ -48,18 +48,78 @@ def format_exotel_callerid(caller_id):
     return value
 
 
-SYSTEM_BASE = """You are the Vardha Voice Connect AI voice assistant.
-This is a short demonstration call. You are an AI voice assistant.
-Speak in simple English, use short sentences, listen before answering, and sound friendly and natural.
-Answer only what the person is asking. Do not repeat information unnecessarily.
-If the person is busy or wants to end the call, politely end it.
-If asked whether you are a real person, say: I am an AI voice assistant.
-If asked why they received the call, say: This is a short Vardha Voice Connect demonstration call. I am an AI voice assistant, and this call is showing how an AI can have a conversation over the phone.
-You MUST use only the active Knowledge Base below for factual business information. Never guess or invent company details, locations, services, prices, or contact information.
-If an answer is not in the Knowledge Base, say exactly: I don't have that information right now, so I don't want to guess.
-Do not read the whole Knowledge Base aloud. Use only relevant facts.
-At the end, thank the person briefly and say goodbye.
+SYSTEM_BASE = """You are the Vardha Voice Connect AI calling assistant.
+
+LANGUAGE POLICY
+- Default to natural, everyday Indian Hindi.
+- Use natural Hinglish when the customer mixes Hindi and English.
+- Switch to English when the customer speaks English or asks to continue in English.
+- Do not force Hindi on a customer who clearly prefers English.
+
+CONVERSATION STYLE
+- Sound like a calm, helpful human phone assistant, not a prerecorded script.
+- Use short, phone-friendly sentences. Usually speak in one or two sentences at a time.
+- Listen to the customer's complete point before answering.
+- Remember information already provided during this call and do not ask for it again unless confirmation is needed.
+- Handle interruptions naturally and continue from the customer's latest point.
+- If speech is unclear, politely ask for clarification. Do not pretend to understand.
+- If the customer changes topic, retain earlier context and return to it when relevant.
+- If the customer is busy, not interested, asks to stop, or wants to end the call, close politely without pressure.
+
+BUSINESS TRUTH / KNOWLEDGE BASE
+- The active Knowledge Base below is the single source of truth for business facts.
+- Use only relevant information from the active Knowledge Base.
+- Never invent or guess prices, discounts, offers, services, availability, locations, timelines, policies, guarantees, contact details, or other company facts.
+- Do not use generic model knowledge as business truth.
+- If the answer is not available in the Knowledge Base, clearly say that the information is not available right now and offer a human follow-up when appropriate.
+- Do not read the Knowledge Base aloud as a list.
+
+LEAD QUALIFICATION
+- Understand the customer's requirement before suggesting a next step.
+- Ask only the missing, relevant questions. Do not interrogate the customer.
+- When applicable, collect name, business details, requirement, budget and timeline.
+- Confirm important information such as names, numbers, email addresses, dates, times or amounts before treating it as final.
+
+SALES / OBJECTIONS
+- Be helpful, not aggressive.
+- For common objections, respond only with supported Knowledge Base information.
+- For complex complaints, unsupported questions or issues that need a human, request human follow-up.
+
+HUMAN HANDOFF
+- If the customer explicitly asks for a human or the issue genuinely needs human support, acknowledge the request.
+- Never claim that a live transfer happened unless the application actually performs a configured transfer.
+- When no live transfer is available, say that a human follow-up has been requested.
+
+APPOINTMENT / CALLBACK
+- If the customer requests a callback or appointment, ask only for the missing date/time, repeat the final details, and confirm them.
+- Do not claim an external calendar booking happened unless an actual calendar integration confirms it.
+
+AI DISCLOSURE
+- If asked whether you are human, clearly say you are an AI assistant.
+- If asked why you are calling, explain the configured call purpose naturally and briefly.
+
+OPENING / CLOSING
+- Start with a short, natural greeting and ask whether it is a convenient time to talk.
+- Do not force a long fixed demo script.
+- End politely when the conversation is finished.
 """
+
+ALLOWED_LOGICAL_VOICES = {"primary", "female"}
+
+
+def resolve_gemini_voice(logical_key="primary"):
+    key = str(logical_key or "primary").strip().lower()
+    if key not in ALLOWED_LOGICAL_VOICES:
+        raise ValueError("Unsupported voice selection. Choose primary or female.")
+    configured = {
+        "primary": settings.GEMINI_VOICE_PRIMARY,
+        "female": settings.GEMINI_VOICE_FEMALE,
+    }[key]
+    if not configured:
+        raise RuntimeError(f"Gemini voice for '{key}' is not configured.")
+    if configured not in settings.GEMINI_ALLOWED_VOICE_IDS:
+        raise RuntimeError(f"Configured Gemini voice '{configured}' is not in GEMINI_ALLOWED_VOICE_IDS.")
+    return configured
 
 
 def kb_text():
@@ -87,13 +147,15 @@ def exotel_auth():
     return (settings.EXOTEL_API_KEY, settings.EXOTEL_API_TOKEN)
 
 
-def make_stream_url(call_id):
+def make_stream_url(call_id, voice_key="primary"):
     """Return the public Exotel WSS endpoint for this call.
 
-    Local development uses an explicit HTTPS tunnel URL in PUBLIC_BASE_URL.
-    Render deployments can leave PUBLIC_BASE_URL empty because settings.py
-    automatically builds it from RENDER_EXTERNAL_HOSTNAME.
+    Only the logical voice key is carried through the provider URL. The actual
+    Gemini voice ID is resolved server-side inside the WebSocket consumer.
     """
+    key = str(voice_key or "primary").strip().lower()
+    if key not in ALLOWED_LOGICAL_VOICES:
+        raise ValueError("Unsupported voice selection. Choose primary or female.")
     base = str(settings.PUBLIC_BASE_URL or "").strip().rstrip("/")
     if not base:
         raise RuntimeError(
@@ -109,7 +171,7 @@ def make_stream_url(call_id):
     if not base.startswith("https://"):
         raise RuntimeError("PUBLIC_BASE_URL must start with https:// so Exotel can open a secure WSS connection.")
     ws_base = "wss://" + base[len("https://"):].rstrip("/")
-    params = {"v": "3", "sample-rate": str(settings.EXOTEL_STREAM_SAMPLE_RATE)}
+    params = {"v": "3", "sample-rate": str(settings.EXOTEL_STREAM_SAMPLE_RATE), "voice": key}
     return f"{ws_base}/ws/exotel/{call_id}/?{urlencode(params)}"
 
 
@@ -126,7 +188,7 @@ def exotel_missing_settings():
     return missing
 
 
-def start_exotel_call(call: Call):
+def start_exotel_call(call: Call, voice_key="primary"):
     missing = exotel_missing_settings()
     if missing:
         raise RuntimeError(
@@ -148,7 +210,7 @@ def start_exotel_call(call: Call):
 
     exotel_from = format_exotel_from(call.phone_number)
     exotel_callerid = format_exotel_callerid(settings.EXOTEL_CALLER_ID)
-    stream_url = make_stream_url(call.id)
+    stream_url = make_stream_url(call.id, voice_key=voice_key)
 
     # Exotel's current Connect Voice AI examples use multipart form-data (-F),
     # not a URL-encoded body. Keep the documented field names/casing too.
@@ -168,9 +230,10 @@ def start_exotel_call(call: Call):
 
     endpoint = exotel_url("/Calls/connect.json")
     log.info(
-        "Calling Exotel Connect Voice AI API endpoint: %s | From: %s | CallerId: %s | StreamUrl: %s",
-        endpoint, exotel_from, exotel_callerid, stream_url,
+        "Calling Exotel Connect Voice AI API | call_id=%s | endpoint=%s | stream_url=%s",
+        call.id, endpoint, stream_url,
     )
+    log.info("Exotel call voice selection | call_id=%s | voice=%s", call.id, voice_key)
 
     def _post_multipart(items):
         return requests.post(
@@ -192,11 +255,11 @@ def start_exotel_call(call: Call):
         and exotel_from.startswith("+91")
     ):
         legacy_from = "0" + exotel_from[3:]
-        log.warning("Retrying Exotel Connect once with legacy From format: %s", legacy_from)
+        log.warning("Retrying Exotel Connect once with legacy From compatibility format | call_id=%s", call.id)
         legacy_payload = [(key, legacy_from if key == "From" else value) for key, value in payload]
         response = _post_multipart(legacy_payload)
         if response.ok:
-            log.info("Exotel accepted legacy From compatibility format: %s", legacy_from)
+            log.info("Exotel accepted legacy From compatibility format | call_id=%s", call.id)
     if not response.ok:
         body = response.text[:1000]
         body_lower = body.lower()
@@ -285,7 +348,11 @@ def refresh_call_from_exotel(call: Call):
         update_fields = ["provider_checked_at"]
         call.provider_checked_at = timezone.now()
         if mapped:
-            call.status = mapped
+            if mapped == "COMPLETED" and call.error_message and call.error_message.lower().startswith(("gemini", "outbound exotel audio", "summary generation")):
+                # Provider COMPLETED must not hide an application-level AI/bridge failure.
+                call.status = "FAILED"
+            else:
+                call.status = mapped
             update_fields.append("status")
             if mapped == "ANSWERED" and not call.answered_at:
                 call.answered_at = timezone.now()
@@ -382,14 +449,14 @@ Transcript:
             fallback = (
                 f"What was discussed:\n{discussed}\n\n"
                 f"What the person asked:\n{questions}\n\n"
-                f"Their requirements:\n{questions}\n\n"
-                f"Important points:\nGemini summary service was unavailable; see the full transcript. Provider detail: {exc}"
+                "Their requirements:\nNot stated\n\n"
+                "Important points:\nSummary generation was unavailable; see the full transcript."
             )
             call.summary = fallback[:12000]
             call.discussed = discussed[:4000]
             call.questions = questions[:4000]
-            call.requirements = questions[:4000]
-            call.important_points = f"Gemini summary unavailable; transcript retained. {exc}"[:4000]
+            call.requirements = "Not stated"
+            call.important_points = "Summary generation was unavailable; transcript retained."
             call.save(update_fields=["summary", "discussed", "questions", "requirements", "important_points"])
             return
 
@@ -423,7 +490,8 @@ Transcript:
         call.summary = text.strip()
         call.save(update_fields=["summary"])
     except Exception as exc:
-        call.summary = f"Summary model unavailable. See the transcript. Provider detail: {exc}"[:12000]
+        log.exception("OpenAI summary generation failed")
+        call.summary = "Summary generation was unavailable; transcript retained."
         call.save(update_fields=["summary"])
 
 def normalize_exotel_status(raw):

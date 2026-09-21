@@ -3,6 +3,7 @@ import base64
 import json
 import logging
 import time
+from urllib.parse import parse_qs
 
 import audioop
 import websockets
@@ -12,7 +13,7 @@ from django.conf import settings
 from django.utils import timezone
 
 from .models import Call
-from .services import generate_summary, system_instructions
+from .services import ALLOWED_LOGICAL_VOICES, generate_summary, resolve_gemini_voice, system_instructions
 
 log = logging.getLogger(__name__)
 
@@ -33,10 +34,28 @@ class ExotelMediaConsumer(AsyncWebsocketConsumer):
 
     async def connect(self):
         self.call_id = self.scope["url_route"]["kwargs"]["call_id"]
+        raw_query = (self.scope.get("query_string") or b"").decode("utf-8", errors="ignore")
+        query = parse_qs(raw_query)
+        self.voice_key = str((query.get("voice") or ["primary"])[0] or "primary").strip().lower()
+        if self.voice_key not in ALLOWED_LOGICAL_VOICES:
+            log.warning("Rejected unsupported logical voice | call_id=%s | voice=%s", self.call_id, self.voice_key)
+            await self.close(code=4400)
+            return
         try:
             self.call = await sync_to_async(Call.objects.get)(id=int(self.call_id))
-        except Exception:
+        except Exception as exc:
+            log.warning("Voice/call lookup failed | call_id=%s | voice=%s | error=%s", self.call_id, self.voice_key, exc)
             await self.close(code=4404)
+            return
+
+        try:
+            self.gemini_voice = resolve_gemini_voice(self.voice_key)
+        except Exception as exc:
+            self.call.status = "FAILED"
+            self.call.error_message = str(exc)[:4000]
+            await sync_to_async(self.call.save)(update_fields=["status", "error_message"])
+            log.warning("Gemini voice configuration rejected | call_id=%s | voice=%s | error=%s", self.call_id, self.voice_key, exc)
+            await self.close(code=4400)
             return
 
         await self.accept()
@@ -65,7 +84,7 @@ class ExotelMediaConsumer(AsyncWebsocketConsumer):
         self._exotel_encoding = "audio/x-l16"
 
         await sync_to_async(self._mark_stream_connected)()
-        log.info("Exotel WSS connected | call_id=%s | provider=gemini", self.call_id)
+        log.info("Exotel WSS connected | call_id=%s | provider=gemini | logical_voice=%s | provider_voice=%s", self.call_id, self.voice_key, self.gemini_voice)
 
     async def receive(self, text_data=None, bytes_data=None):
         try:
@@ -201,10 +220,9 @@ class ExotelMediaConsumer(AsyncWebsocketConsumer):
                         "responseModalities": ["AUDIO"],
                         "speechConfig": {
                             "voiceConfig": {
-                                "prebuiltVoiceConfig": {"voiceName": settings.GEMINI_VOICE}
+                                "prebuiltVoiceConfig": {"voiceName": self.gemini_voice}
                             }
                         },
-                        "temperature": 0.4,
                     },
                     "systemInstruction": {"parts": [{"text": instructions}]},
                     "inputAudioTranscription": {},
@@ -242,10 +260,9 @@ class ExotelMediaConsumer(AsyncWebsocketConsumer):
                     "turns": [{
                         "role": "user",
                         "parts": [{"text": (
-                            "Start the phone conversation now. Say one short, natural greeting: "
-                            "Hello, this is Vardha Voice Connect, an AI voice assistant from Vardha Group. "
-                            "This is a quick demonstration call. Do you have a minute? "
-                            "Then listen. Do not give a long introduction."
+                            "Begin the call now. Give a short, natural Indian-Hindi greeting. "
+                            "Introduce yourself as the Vardha Voice Connect AI assistant, ask whether this is a convenient time to talk, "
+                            "and then listen. Use English only if the customer prefers English. Do not give a long scripted introduction."
                         )}]
                     }],
                     "turnComplete": True,

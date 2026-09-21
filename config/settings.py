@@ -33,6 +33,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "voice_agent.middleware.AdminBasicAuthMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -91,7 +92,11 @@ ASGI_THREADS = 4
 CHANNEL_LAYERS = {"default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}}
 
 APP_NAME = os.getenv("APP_NAME", "Vardha Voice Connect — AI Voice Calling Agent")
-APP_VERSION = os.getenv("APP_VERSION", "1.2.1")
+VERSION_FILE = BASE_DIR / "VERSION.txt"
+try:
+    APP_VERSION = VERSION_FILE.read_text(encoding="utf-8").strip() or "0.0.0-dev"
+except OSError:
+    APP_VERSION = "0.0.0-dev"
 PUBLIC_BASE_URL = os.getenv("PUBLIC_BASE_URL", "").strip().strip('"').strip("'").rstrip("/")
 # On Render, use the hostname assigned to the web service unless a custom
 # PUBLIC_BASE_URL is explicitly supplied. This removes the localhost/WSS
@@ -121,6 +126,12 @@ if not DEBUG:
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
     SECURE_CONTENT_TYPE_NOSNIFF = True
+
+# Minimal operator protection: local development stays convenient, while a public
+# non-debug deployment requires Basic Auth credentials unless explicitly disabled.
+ADMIN_AUTH_ENABLED = os.getenv("ADMIN_AUTH_ENABLED", "true" if not DEBUG else "false").lower() == "true"
+ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "").strip()
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "")
 
 def env_first(*names, default=""):
     """Return the first non-empty environment value, with whitespace/quotes normalized."""
@@ -160,9 +171,22 @@ EXOTEL_RECORD = os.getenv("EXOTEL_RECORD", "true").lower() == "true"
 EXOTEL_TIME_LIMIT = int(os.getenv("EXOTEL_TIME_LIMIT", "1800"))
 AI_PROVIDER = os.getenv("AI_PROVIDER", "gemini").strip().lower() or "gemini"
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
-GEMINI_LIVE_MODEL = os.getenv("GEMINI_LIVE_MODEL", "gemini-3.1-flash-live-preview").strip()
-GEMINI_TEXT_MODEL = os.getenv("GEMINI_TEXT_MODEL", "gemini-3.1-flash-lite").strip()
+GEMINI_LIVE_MODEL = os.getenv("GEMINI_LIVE_MODEL", "gemini-3.8-live").strip()
+GEMINI_TEXT_MODEL = os.getenv("GEMINI_TEXT_MODEL", "gemini-3.6-flash").strip()
 GEMINI_VOICE = os.getenv("GEMINI_VOICE", "Kore").strip()
+GEMINI_VOICE_PRIMARY = os.getenv("GEMINI_VOICE_PRIMARY", GEMINI_VOICE or "Kore").strip()
+GEMINI_VOICE_FEMALE = os.getenv("GEMINI_VOICE_FEMALE", "Aoede").strip()
+GEMINI_ALLOWED_VOICE_IDS = tuple(
+    dict.fromkeys(
+        x.strip()
+        for x in os.getenv(
+            "GEMINI_ALLOWED_VOICE_IDS",
+            f"{GEMINI_VOICE_PRIMARY},{GEMINI_VOICE_FEMALE}",
+        ).split(",")
+        if x.strip()
+    )
+)
+HUMAN_HANDOFF_NUMBER = os.getenv("HUMAN_HANDOFF_NUMBER", "").strip()
 
 # Optional legacy OpenAI settings. They remain available for future provider fallback.
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")

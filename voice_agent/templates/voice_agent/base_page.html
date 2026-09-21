@@ -5,105 +5,160 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>{{ app_name }} | v{{ app_version }}</title>
+  <meta name="theme-color" content="#0e4b35">
   <link rel="icon" type="image/svg+xml" href="{% static 'favicon.svg' %}">
   <link rel="stylesheet" href="{% static 'voice_agent/styles.css' %}?v={{ app_version }}">
 </head>
-<meta name="csrf-token" content="{{ csrf_token }}">
-<body data-page="{{ page }}" data-call-id="{{ call_id|default:'' }}">
+<body data-page="{{ page }}" data-call-id="{{ call_id|default:'' }}" data-app-version="{{ app_version }}">
   <div class="mobile-nav-backdrop" id="mobileNavBackdrop"></div>
-  <div class="trial-notice-backdrop" id="trialNoticeBackdrop" aria-hidden="true"></div>
-  <section class="trial-notice" id="trialNotice" role="dialog" aria-modal="true" aria-labelledby="trialNoticeTitle" aria-describedby="trialNoticeText" hidden>
+
+  <section class="trial-notice" id="trialNotice" role="dialog" aria-modal="true" aria-labelledby="trialNoticeTitle" hidden>
     <button class="trial-notice-close" id="trialNoticeClose" type="button" aria-label="Close trial account notice">×</button>
     <div class="trial-notice-icon" aria-hidden="true">!</div>
-    <div class="trial-notice-copy">
-      <div class="trial-notice-label">DEMO INFORMATION</div>
-      <h2 id="trialNoticeTitle">Exotel Trial Account Limitation</h2>
-      <p id="trialNoticeText">The project is fully implemented and has been successfully tested. The current Exotel account is still under trial/KYC restriction.</p>
-      <div class="trial-notice-points">
-        <p><strong>Why?</strong> This is a student project. I have a PAN document, but I currently do not have all business documents required for Exotel KYC approval.</p>
-        <p><strong>What does this affect?</strong> Until KYC is approved, Exotel may allow outbound testing only to verified numbers added to the account. Unverified numbers can be rejected by the provider.</p>
-        <p><strong>How can you check the project?</strong> Open <strong>Call History</strong> to see successful test calls, including call details, recording, transcript and AI-generated summary.</p>
-      </div>
-      <p class="trial-notice-foot"><strong>This is an Exotel account restriction, not a project/code limitation.</strong></p>
-      <button class="primary trial-notice-continue" id="trialNoticeContinue" type="button">Got it — Continue to Dashboard</button>
+    <div class="trial-notice-label">PROVIDER NOTICE</div>
+    <h2 id="trialNoticeTitle">Exotel trial / KYC notice</h2>
+    <p>Provider restrictions can affect which destination numbers are allowed for outbound testing.</p>
+    <div class="trial-notice-points">
+      <p><strong>What this means:</strong> Exotel may require the destination number to be verified or the account to complete the provider's KYC/enablement process.</p>
+      <p><strong>What remains available:</strong> The application can still be reviewed locally, and successful provider calls appear in Call History with their available recording, transcript and summary data.</p>
+      <p><strong>Important:</strong> This message describes an external provider limitation; it is not a claim that a live call has been verified in this environment.</p>
     </div>
+    <button class="primary trial-notice-continue" id="trialNoticeContinue" type="button">Continue</button>
   </section>
+
   <div class="app-shell">
     <aside class="sidebar" id="sidebar">
       <button class="mobile-menu-close" id="mobileMenuClose" type="button" aria-label="Close menu">×</button>
       <div class="brand">
         <div class="brand-mark">V</div>
-        <div><div class="brand-name">Vardha Voice<br>Connect</div><div class="brand-sub">Simple AI voice calling</div></div>
+        <div>
+          <div class="brand-name">Vardha Voice<br>Connect</div>
+          <div class="brand-sub">AI calling workspace</div>
+        </div>
       </div>
-      <nav class="nav">
+      <nav class="nav" aria-label="Primary navigation">
         <a class="nav-item {% if active == 'dashboard' %}active{% endif %}" data-nav-link href="/">Dashboard</a>
-        <a class="nav-item {% if active == 'call' %}active{% endif %}" data-nav-link href="/call">Call someone</a>
-        <a class="nav-item {% if active == 'knowledge' %}active{% endif %}" data-nav-link href="/knowledge">Business information</a>
-        <a class="nav-item {% if active == 'history' %}active{% endif %}" data-nav-link href="/history">Call history</a>
+        <a class="nav-item {% if active == 'call' %}active{% endif %}" data-nav-link href="/call">Make a call</a>
+        <a class="nav-item {% if active == 'knowledge' %}active{% endif %}" data-nav-link href="/knowledge">Knowledge Base</a>
+        <a class="nav-item {% if active == 'history' %}active{% endif %}" data-nav-link href="/history">Call History</a>
       </nav>
-      <div class="sidebar-footer"><strong>Vardha Group</strong><span>Vardha Voice Connect v{{ app_version }}</span></div>
+      <div class="sidebar-footer">
+        <strong>Vardha Group</strong>
+        <span>Vardha Voice Connect v{{ app_version }}</span>
+      </div>
     </aside>
 
     <main class="main">
       <header class="topbar">
         <div class="mobile-brand">
           <div class="mobile-brand-mark">V</div>
-          <div class="mobile-brand-text">
-            <strong>Vardha Voice Connect</strong>
-            <span>Simple AI voice calling</span>
-          </div>
+          <div class="mobile-brand-text"><strong>Vardha Voice Connect</strong><span>AI calling workspace</span></div>
         </div>
         <div class="top-title">Vardha Voice Connect — AI Voice Calling Agent</div>
-        <div class="provider"><span class="dot" id="healthDot"></span><span id="healthText">Checking service</span></div>
-        <button class="mobile-menu-open" id="mobileMenuOpen" type="button" aria-label="Open navigation menu" aria-expanded="false">
-          <span></span><span></span><span></span>
-        </button>
+        <div class="provider" aria-live="polite"><span class="dot" id="healthDot"></span><span id="healthText">Checking service</span></div>
+        <button class="mobile-menu-open" id="mobileMenuOpen" type="button" aria-label="Open navigation menu" aria-expanded="false"><span></span><span></span><span></span></button>
       </header>
 
       {% if page == 'dashboard' %}
       <section class="content">
-        <div class="eyebrow">VARDHA VOICE CONNECT</div>
-        <h1>AI calling workspace</h1>
-        <p class="lead">Place a call, let the AI talk naturally, and review the result in one simple workspace.</p>
-        <div class="grid three">
-          <div class="card stat"><div class="label">Provider</div><div class="big">Exotel</div><div class="muted">Outbound voice + AgentStream</div></div>
-          <div class="card stat"><div class="label">AI</div><div class="big">Gemini Live</div><div class="muted">Real-time speech-to-speech conversation</div></div>
-          <div class="card stat"><div class="label">Knowledge Base</div><div class="big" id="kbCount">—</div><div class="muted">Active facts available to AI</div></div>
+        <div class="page-head">
+          <div>
+            <div class="eyebrow">VARDHA VOICE CONNECT</div>
+            <h1>Calling workspace</h1>
+            <p class="lead">One place to place a call, monitor readiness, and review the conversation result.</p>
+          </div>
+          <a class="primary primary-link" href="/call">Make a call</a>
         </div>
+
+        <div class="status-strip" id="dashboardReadiness">
+          <div class="status-summary"><span class="dot"></span><strong>Checking readiness…</strong></div>
+          <div class="status-items"><span>Exotel</span><span>Gemini Live</span><span>Knowledge Base</span></div>
+        </div>
+
+        <div class="grid four dashboard-stats">
+          <div class="card stat"><div class="label">Total calls</div><div class="big" id="statTotal">—</div><div class="muted">Recorded in local history</div></div>
+          <div class="card stat"><div class="label">Completed</div><div class="big" id="statCompleted">—</div><div class="muted">Provider + AI flow completed</div></div>
+          <div class="card stat"><div class="label">Failed</div><div class="big" id="statFailed">—</div><div class="muted">Needs review or retry</div></div>
+          <div class="card stat"><div class="label">In progress</div><div class="big" id="statActive">—</div><div class="muted">Currently active calls</div></div>
+        </div>
+
         <div class="grid two">
-          <div class="card"><h3>How the call works</h3><p>Enter a mobile number, place the call, let the person answer, and the AI will introduce itself, listen, answer from the Knowledge Base, and close the call politely.</p><div class="flow">Number <span>→</span> Call <span>→</span> AI Conversation <span>→</span> Recording <span>→</span> Summary</div></div>
-          <div class="card"><h3>Knowledge policy</h3><p>The AI only uses active business information saved in the Knowledge Base. If a fact is missing, it says so politely instead of guessing.</p></div>
+          <div class="card feature-card">
+            <div class="section-title-row"><div><div class="card-kicker">CALL FLOW</div><h3>From number to call review</h3></div><a class="inline-link" href="/history">Open history →</a></div>
+            <div class="flow flow-modern"><span>Number</span><b>→</b><span>Outbound call</span><b>→</b><span>AI conversation</span><b>→</b><span>Recording</span><b>→</b><span>Transcript</span><b>→</b><span>Summary</span></div>
+          </div>
+          <div class="card feature-card">
+            <div class="card-kicker">KNOWLEDGE POLICY</div>
+            <h3>Business answers stay grounded</h3>
+            <p>The active Knowledge Base is treated as the business source of truth. When a fact is missing, the assistant should say so instead of guessing.</p>
+            <div class="policy-badge"><span class="policy-check">✓</span><span><strong id="kbCount">—</strong> active knowledge items</span></div>
+          </div>
+        </div>
+
+        <div class="card recent-card">
+          <div class="section-title-row"><div><div class="card-kicker">RECENT ACTIVITY</div><h3>Latest calls</h3></div><a class="inline-link" href="/history">View all →</a></div>
+          <div id="dashboardRecent" class="recent-list"><div class="empty-state">Loading recent calls…</div></div>
         </div>
       </section>
+
       {% elif page == 'call' %}
       <section class="content">
-        <div class="eyebrow">CALL SOMEONE</div>
-        <h1>Make an outbound call</h1>
-        <p class="lead">Enter a mobile number in international format. During Exotel trial testing, the destination number may need to be added and verified before the provider allows the call.</p>
+        <div class="page-head">
+          <div>
+            <div class="eyebrow">MAKE A CALL</div>
+            <h1>Start an outbound AI call</h1>
+            <p class="lead">Choose the voice for this call, enter the destination in international format, and let the Exotel + Gemini flow handle the conversation.</p>
+          </div>
+          <a class="secondary-link" href="/history">Call History</a>
+        </div>
+
         <div class="call-layout">
           <form class="card call-card" id="callForm">
             {% csrf_token %}
-            <h3>Call someone</h3>
-            <label>Mobile number</label>
-            <input id="phoneNumber" type="tel" placeholder="+919876543210" autocomplete="tel" required>
-            <button class="primary" type="submit" id="callButton">Call</button>
-            <div id="callSetupHint" class="result setup-hint"></div><div id="callResult" class="result"></div>
+            <div class="card-kicker">CALL SETUP</div>
+            <h3>Place a call</h3>
+            <p class="form-help">The voice selection is per-call and does not change your global configuration.</p>
+            <label for="phoneNumber">Mobile number</label>
+            <input id="phoneNumber" type="tel" inputmode="tel" placeholder="+919876543210" autocomplete="tel" required>
+            <label>Voice</label>
+            <div class="voice-options" role="radiogroup" aria-label="Voice selection">
+              <label class="voice-option active"><input type="radio" name="voice" value="primary" checked><span class="voice-copy"><strong>Main Voice</strong><small>Configured primary Gemini voice</small></span><span class="radio-mark"></span></label>
+              <label class="voice-option"><input type="radio" name="voice" value="female"><span class="voice-copy"><strong>Female Voice</strong><small>Configured secondary Gemini voice</small></span><span class="radio-mark"></span></label>
+            </div>
+            <div class="ready-row" id="callReadiness"><span class="dot"></span><span>Checking provider readiness…</span></div>
+            <button class="primary call-submit" type="submit" id="callButton">Call now</button>
+            <div id="callSetupHint" class="result setup-hint"></div>
+            <div id="callResult" class="result"></div>
           </form>
-          <div class="card"><h3>Call flow</h3><ol class="steps"><li>Exotel places the call.</li><li>When the person answers, Exotel opens the secure audio stream.</li><li>The AI connects to Gemini Live and gives the company greeting.</li><li>The AI listens and answers factual questions from the active Knowledge Base.</li><li>The call is recorded and the system saves status, transcript, duration and summary.</li></ol></div>
+
+          <div class="card side-guide">
+            <div class="card-kicker">WHAT HAPPENS NEXT</div>
+            <h3>Simple operational flow</h3>
+            <ol class="steps steps-clean">
+              <li><span>01</span><div><strong>Exotel dials</strong><p>The provider places the outbound call and opens the secure stream after connection.</p></div></li>
+              <li><span>02</span><div><strong>Gemini joins</strong><p>The selected voice is mapped server-side to a configured Gemini Live voice.</p></div></li>
+              <li><span>03</span><div><strong>Conversation starts</strong><p>The assistant speaks Hindi first, handles Hinglish/English, context and interruption.</p></div></li>
+              <li><span>04</span><div><strong>Review the result</strong><p>Recording, transcript, duration, status and summary remain in Call History.</p></div></li>
+            </ol>
+          </div>
         </div>
       </section>
+
       {% elif page == 'knowledge' %}
       <section class="content">
-        <div class="eyebrow">BUSINESS INFORMATION</div>
-        <h1>What the AI can say</h1>
-        <p class="lead">Add short, clear business facts here. The AI uses only these active facts during a call.</p>
+        <div class="page-head">
+          <div>
+            <div class="eyebrow">KNOWLEDGE BASE</div>
+            <h1>Business information</h1>
+            <p class="lead">Maintain the facts the AI is allowed to use during calls. Active entries are included in the live prompt.</p>
+          </div>
+        </div>
         <div class="kb-grid">
           <form class="card add-card" id="kbForm">
             {% csrf_token %}
-            <div class="form-heading">
-              <h3>Add business information</h3>
-              <p class="form-help">Write one useful fact per entry. Simple wording works best.</p>
-            </div>
+            <div class="card-kicker">ADD INFORMATION</div>
+            <h3>Add a business fact</h3>
+            <p class="form-help">Keep entries short and factual. Avoid secrets or sensitive customer data.</p>
             <label for="kbTitle">Topic</label>
             <input id="kbTitle" required placeholder="Example: About Vardha Group" autocomplete="off">
             <label for="kbContent">Details</label>
@@ -112,27 +167,32 @@
             <div id="kbResult" class="result"></div>
           </form>
           <div class="kb-right">
-            <div class="kb-section-intro">
-              <h3>Saved information</h3>
-              <p>These are the facts currently available to the AI.</p>
-            </div>
+            <div class="section-title-row"><div><div class="card-kicker">ACTIVE CONTENT</div><h3>Saved information</h3></div></div>
             <div id="kbList" class="kb-list"></div>
           </div>
         </div>
       </section>
+
       {% elif page == 'history' %}
       <section class="content">
-        <div class="eyebrow">CALL HISTORY</div>
-        <h1>Previous calls</h1>
-        <p class="lead">Every call is listed here with its status, duration, recording and summary. Open any row for the full transcript and call details.</p>
-        <div class="history-table-wrap"><table class="history-table"><thead><tr><th>Date &amp; time</th><th>Number</th><th>Status</th><th>Duration</th><th>Recording</th><th>Summary</th><th></th></tr></thead><tbody id="historyList"></tbody></table></div>
+        <div class="page-head">
+          <div>
+            <div class="eyebrow">CALL HISTORY</div>
+            <h1>Previous calls</h1>
+            <p class="lead">Review status, duration, recording availability and summary. Each local history record can be viewed or deleted.</p>
+          </div>
+          <a class="primary primary-link" href="/call">Make a call</a>
+        </div>
+        <div class="history-toolbar"><span id="historyCount">Loading calls…</span><button class="secondary-button" id="historyRefresh" type="button">Refresh</button></div>
+        <div class="history-table-wrap"><table class="history-table"><thead><tr><th>Date &amp; time</th><th>Number</th><th>Status</th><th>Duration</th><th>Recording</th><th>Summary</th><th>Actions</th></tr></thead><tbody id="historyList"></tbody></table></div>
       </section>
+
       {% elif page == 'detail' %}
       <section class="content">
         <div class="detail-back-row"><a class="back-link" href="/history" data-nav-link aria-label="Back to call history">← Back to Call history</a></div>
         <div class="eyebrow">CALL DETAILS</div>
         <h1>Call information</h1>
-        <p class="lead">The complete call record is shown below: provider status, duration, recording, transcript, summary and any error message.</p>
+        <p class="lead">Provider state, recording, transcript and AI summary for this local call history record.</p>
         <div id="detail" class="detail-grid"></div>
       </section>
       {% endif %}

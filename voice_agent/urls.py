@@ -12,6 +12,7 @@ urlpatterns = [
     path("api/csrf", views.api_csrf, name="api_csrf"),
     path("api/call", views.api_make_call, name="api_make_call"),
     path("api/health", views.api_health, name="api_health"),
+    path("api/dashboard", views.api_dashboard, name="api_dashboard"),
     path("api/knowledge", views.api_knowledge, name="api_knowledge"),
     path("api/knowledge/<int:item_id>", views.api_knowledge_item, name="api_knowledge_item"),
     path("api/history", views.api_history, name="api_history"),
