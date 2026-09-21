@@ -8,15 +8,9 @@ services:
       - key: DJANGO_DEBUG
         value: "false"
       - key: ADMIN_AUTH_ENABLED
-        value: "true"
-      - key: ADMIN_USERNAME
-        sync: false
-      - key: ADMIN_PASSWORD
-        sync: false
+        value: "false"
       - key: APP_NAME
         value: "Vardha Voice Connect — AI Voice Calling Agent"
-      - key: APP_VERSION
-        value: "1.4.0"
       - key: DEFAULT_TIMEZONE
         value: "Asia/Kolkata"
       - key: EXOTEL_STREAMTYPE

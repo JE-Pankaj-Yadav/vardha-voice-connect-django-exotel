@@ -410,10 +410,15 @@ The code can be tested locally or with safe simulations for provider-dependent c
 
 ## Public deployment authentication
 
-For `DJANGO_DEBUG=false`, minimal operator Basic Authentication is enabled by default. Set `ADMIN_USERNAME` and `ADMIN_PASSWORD` in the deployment environment. Local debug mode disables it by default, and the middleware also fails open during debug if an old `.env` still has `ADMIN_AUTH_ENABLED=true` but no credentials. Exotel status/passthru webhooks and `/api/health` remain reachable for provider/health checks; the operator dashboard and application APIs are protected. Never commit admin credentials.
+Admin Basic Authentication is **disabled by default** so the manager/demo deployment can open directly without a username/password. Keep `ADMIN_AUTH_ENABLED=false` on the public demo deployment.
+
+Authentication is an optional hardening feature. To enable it intentionally, set `ADMIN_AUTH_ENABLED=true` together with `ADMIN_USERNAME` and `ADMIN_PASSWORD`. If the flag is accidentally left `true` without credentials, the middleware does not lock the whole application with a 503; it treats authentication as not configured and keeps the demo accessible. Never commit admin credentials.
 
 
 ## Release version
+
+Current release: `1.4.5`
+
 The application version is sourced only from `VERSION.txt`. Do not set `APP_VERSION` in `.env`; existing stale values are ignored.
 
 

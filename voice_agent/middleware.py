@@ -50,17 +50,10 @@ class AdminBasicAuthMiddleware:
             getattr(settings, "ADMIN_PASSWORD", "")
         )
         if not has_credentials:
-            # Local/debug development must remain usable even if an old or copied
-            # .env accidentally leaves ADMIN_AUTH_ENABLED=true. Public/non-debug
-            # deployments still fail closed so they cannot silently run without
-            # operator credentials.
-            if getattr(settings, "DEBUG", False):
-                return self.get_response(request)
-            return HttpResponse(
-                "Admin authentication is enabled, but ADMIN_USERNAME/ADMIN_PASSWORD are not configured.",
-                status=503,
-                content_type="text/plain; charset=utf-8",
-            )
+            # Authentication is opt-in. If an old deployment or environment still
+            # contains ADMIN_AUTH_ENABLED=true but no credentials, do not lock the
+            # entire public demo behind a misleading 503 page.
+            return self.get_response(request)
         response = HttpResponse("Authentication required.", status=401, content_type="text/plain; charset=utf-8")
         response["WWW-Authenticate"] = 'Basic realm="Vardha Voice Connect", charset="UTF-8"'
         return response

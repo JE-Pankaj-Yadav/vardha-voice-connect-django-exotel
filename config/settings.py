@@ -127,9 +127,10 @@ if not DEBUG:
     CSRF_COOKIE_SECURE = True
     SECURE_CONTENT_TYPE_NOSNIFF = True
 
-# Minimal operator protection: local development stays convenient, while a public
-# non-debug deployment requires Basic Auth credentials unless explicitly disabled.
-ADMIN_AUTH_ENABLED = os.getenv("ADMIN_AUTH_ENABLED", "true" if not DEBUG else "false").lower() == "true"
+# Optional operator protection. It is intentionally disabled by default so a public demo
+# deployment opens without requiring a username/password. Enable explicitly only when
+# ADMIN_USERNAME and ADMIN_PASSWORD are configured.
+ADMIN_AUTH_ENABLED = os.getenv("ADMIN_AUTH_ENABLED", "false").lower() == "true"
 ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "").strip()
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "")
 

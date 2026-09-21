@@ -21,9 +21,16 @@ class PageSmokeTests(TestCase):
         self.assertContains(response, "Vardha Voice Connect")
 
     @override_settings(ADMIN_AUTH_ENABLED=True, ADMIN_USERNAME="", ADMIN_PASSWORD="", DEBUG=False)
-    def test_non_debug_mode_without_admin_credentials_fails_closed(self):
+    def test_non_debug_mode_without_admin_credentials_does_not_block_public_demo(self):
         response = self.client.get("/")
-        self.assertEqual(response.status_code, 503)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Vardha Voice Connect")
+
+    @override_settings(ADMIN_AUTH_ENABLED=True, ADMIN_USERNAME="admin", ADMIN_PASSWORD="secret", DEBUG=False)
+    def test_auth_remains_available_when_explicitly_configured(self):
+        response = self.client.get("/")
+        self.assertEqual(response.status_code, 401)
+        self.assertIn("WWW-Authenticate", response.headers)
 
     def test_all_main_pages_return_200(self):
         for path in ["/", "/call", "/knowledge", "/history"]:
